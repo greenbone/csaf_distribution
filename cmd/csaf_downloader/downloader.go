@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2022, 2023 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022, 2023 Intevation GmbH <https://intevation.de>
 
-package main
+package csaf_downloader
 
 import (
 	"bytes"
@@ -38,12 +38,12 @@ import (
 	"github.com/csaf-poc/csaf_distribution/v3/util"
 )
 
-type downloader struct {
-	cfg       *config
+type Downloader struct {
+	cfg       *Config
 	keys      *crypto.KeyRing
 	eval      *util.PathEval
 	validator csaf.RemoteValidator
-	forwarder *forwarder
+	Forwarder *Forwarder
 	mkdirMu   sync.Mutex
 	statsMu   sync.Mutex
 	stats     stats
@@ -54,7 +54,7 @@ type downloader struct {
 // unsafe mode.
 const failedValidationDir = "failed_validation"
 
-func newDownloader(cfg *config) (*downloader, error) {
+func NewDownloader(cfg *Config) (*Downloader, error) {
 
 	var validator csaf.RemoteValidator
 
@@ -72,14 +72,14 @@ func newDownloader(cfg *config) (*downloader, error) {
 		validator = csaf.SynchronizedRemoteValidator(validator)
 	}
 
-	return &downloader{
+	return &Downloader{
 		cfg:       cfg,
 		eval:      util.NewPathEval(),
 		validator: validator,
 	}, nil
 }
 
-func (d *downloader) close() {
+func (d *Downloader) Close() {
 	if d.validator != nil {
 		d.validator.Close()
 		d.validator = nil
@@ -87,7 +87,7 @@ func (d *downloader) close() {
 }
 
 // addStats add stats to total stats
-func (d *downloader) addStats(o *stats) {
+func (d *Downloader) addStats(o *stats) {
 	d.statsMu.Lock()
 	defer d.statsMu.Unlock()
 	d.stats.add(o)
@@ -105,7 +105,7 @@ func logRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-func (d *downloader) httpClient() util.Client {
+func (d *Downloader) httpClient() util.Client {
 
 	hClient := http.Client{}
 
@@ -165,7 +165,7 @@ func httpLog(who string) func(string, string) {
 	}
 }
 
-func (d *downloader) download(ctx context.Context, domain string) error {
+func (d *Downloader) download(ctx context.Context, domain string) error {
 	client := d.httpClient()
 
 	loader := csaf.NewProviderMetadataLoader(client)
@@ -215,7 +215,7 @@ func (d *downloader) download(ctx context.Context, domain string) error {
 	})
 }
 
-func (d *downloader) downloadFiles(
+func (d *Downloader) downloadFiles(
 	ctx context.Context,
 	label csaf.TLPLabel,
 	files []csaf.AdvisoryFile,
@@ -264,7 +264,7 @@ allFiles:
 	return errors.Join(errs...)
 }
 
-func (d *downloader) loadOpenPGPKeys(
+func (d *Downloader) loadOpenPGPKeys(
 	client util.Client,
 	doc any,
 	base *url.URL,
@@ -355,7 +355,7 @@ func (d *downloader) loadOpenPGPKeys(
 }
 
 // logValidationIssues logs the issues reported by the advisory schema validation.
-func (d *downloader) logValidationIssues(url string, errors []string, err error) {
+func (d *Downloader) logValidationIssues(url string, errors []string, err error) {
 	if err != nil {
 		slog.Error("Failed to validate",
 			"url", url,
@@ -375,7 +375,7 @@ func (d *downloader) logValidationIssues(url string, errors []string, err error)
 	}
 }
 
-func (d *downloader) downloadWorker(
+func (d *Downloader) downloadWorker(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	label csaf.TLPLabel,
@@ -606,8 +606,8 @@ nextAdvisory:
 		valStatus.update(validValidationStatus)
 
 		// Send to forwarder
-		if d.forwarder != nil {
-			d.forwarder.forward(
+		if d.Forwarder != nil {
+			d.Forwarder.forward(
 				filename, data.String(),
 				valStatus,
 				string(s256Data),
@@ -680,13 +680,13 @@ nextAdvisory:
 	}
 }
 
-func (d *downloader) mkdirAll(path string, perm os.FileMode) error {
+func (d *Downloader) mkdirAll(path string, perm os.FileMode) error {
 	d.mkdirMu.Lock()
 	defer d.mkdirMu.Unlock()
 	return os.MkdirAll(path, perm)
 }
 
-func (d *downloader) checkSignature(data []byte, sign *crypto.PGPSignature) error {
+func (d *Downloader) checkSignature(data []byte, sign *crypto.PGPSignature) error {
 	pm := crypto.NewPlainMessage(data)
 	t := crypto.GetUnixTime()
 	return d.keys.VerifyDetached(pm, sign, t)
@@ -733,7 +733,7 @@ func loadHash(client util.Client, p string) ([]byte, []byte, error) {
 }
 
 // run performs the downloads for all the given domains.
-func (d *downloader) run(ctx context.Context, domains []string) error {
+func (d *Downloader) Run(ctx context.Context, domains []string) error {
 	defer d.stats.log()
 	for _, domain := range domains {
 		if err := d.download(ctx, domain); err != nil {

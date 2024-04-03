@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2023 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2023 Intevation GmbH <https://intevation.de>
 
-package main
+package csaf_downloader
 
 import (
 	"bytes"
@@ -45,31 +45,31 @@ func (vs *validationStatus) update(status validationStatus) {
 	}
 }
 
-// forwarder forwards downloaded advisories to a given
+// Forwarder forwards downloaded advisories to a given
 // HTTP endpoint.
-type forwarder struct {
-	cfg    *config
-	cmds   chan func(*forwarder)
+type Forwarder struct {
+	cfg    *Config
+	cmds   chan func(*Forwarder)
 	client util.Client
 
 	failed    int
 	succeeded int
 }
 
-// newForwarder creates a new forwarder.
-func newForwarder(cfg *config) *forwarder {
+// NewForwarder creates a new forwarder.
+func NewForwarder(cfg *Config) *Forwarder {
 	queue := cfg.ForwardQueue
 	if queue < 1 {
 		queue = 1
 	}
-	return &forwarder{
+	return &Forwarder{
 		cfg:  cfg,
-		cmds: make(chan func(*forwarder), queue),
+		cmds: make(chan func(*Forwarder), queue),
 	}
 }
 
-// run runs the forwarder. Meant to be used in a Go routine.
-func (f *forwarder) run() {
+// Run runs the forwarder. Meant to be used in a Go routine.
+func (f *Forwarder) Run() {
 	defer slog.Debug("forwarder done")
 
 	for cmd := range f.cmds {
@@ -78,13 +78,13 @@ func (f *forwarder) run() {
 }
 
 // close terminates the forwarder.
-func (f *forwarder) close() {
+func (f *Forwarder) Close() {
 	close(f.cmds)
 }
 
 // log logs the current statistics.
-func (f *forwarder) log() {
-	f.cmds <- func(f *forwarder) {
+func (f *Forwarder) Log() {
+	f.cmds <- func(f *Forwarder) {
 		slog.Info("Forward statistics",
 			"succeeded", f.succeeded,
 			"failed", f.failed)
@@ -93,7 +93,7 @@ func (f *forwarder) log() {
 
 // httpClient returns a cached HTTP client used for uploading
 // the advisories to the configured HTTP endpoint.
-func (f *forwarder) httpClient() util.Client {
+func (f *Forwarder) httpClient() util.Client {
 	if f.client != nil {
 		return f.client
 	}
@@ -138,7 +138,7 @@ func replaceExt(fname, nExt string) string {
 }
 
 // buildRequest creates an HTTP request suited to forward the given advisory.
-func (f *forwarder) buildRequest(
+func (f *Forwarder) buildRequest(
 	filename, doc string,
 	status validationStatus,
 	sha256, sha512 string,
@@ -190,7 +190,7 @@ func (f *forwarder) buildRequest(
 
 // storeFailedAdvisory stores an advisory in a special folder
 // in case the forwarding failed.
-func (f *forwarder) storeFailedAdvisory(filename, doc, sha256, sha512 string) error {
+func (f *Forwarder) storeFailedAdvisory(filename, doc, sha256, sha512 string) error {
 	// Create special folder if it does not exist.
 	dir := filepath.Join(f.cfg.Directory, failedForwardDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -216,7 +216,7 @@ func (f *forwarder) storeFailedAdvisory(filename, doc, sha256, sha512 string) er
 }
 
 // storeFailed is a logging wrapper around storeFailedAdvisory.
-func (f *forwarder) storeFailed(filename, doc, sha256, sha512 string) {
+func (f *Forwarder) storeFailed(filename, doc, sha256, sha512 string) {
 	f.failed++
 	if err := f.storeFailedAdvisory(filename, doc, sha256, sha512); err != nil {
 		slog.Error("Storing advisory failed forwarding failed",
@@ -240,13 +240,13 @@ func limitedString(r io.Reader, max int) (string, error) {
 // forward sends a given document with filename, status and
 // checksums to the forwarder. This is async to the degree
 // till the configured queue size is filled.
-func (f *forwarder) forward(
+func (f *Forwarder) forward(
 	filename, doc string,
 	status validationStatus,
 	sha256, sha512 string,
 ) {
 	// Run this in the main loop of the forwarder.
-	f.cmds <- func(f *forwarder) {
+	f.cmds <- func(f *Forwarder) {
 		req, err := f.buildRequest(filename, doc, status, sha256, sha512)
 		if err != nil {
 			slog.Error("building forward Request failed",

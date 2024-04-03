@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2022 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022 Intevation GmbH <https://intevation.de>
 
-package main
+package csaf_downloader
 
 import (
 	"crypto/tls"
@@ -42,7 +42,7 @@ const (
 	validationUnsafe = validationMode("unsafe")
 )
 
-type config struct {
+type Config struct {
 	Directory            string            `short:"d" long:"directory" description:"DIRectory to store the downloaded files in" value-name:"DIR" toml:"directory"`
 	Insecure             bool              `long:"insecure" description:"Do not check TLS certificates from provider" toml:"insecure"`
 	IgnoreSignatureCheck bool              `long:"ignore_sigcheck" description:"Ignore signature check results, just warn on mismatch" toml:"ignore_sigcheck"`
@@ -87,18 +87,18 @@ var configPaths = []string{
 	"csaf_downloader.toml",
 }
 
-// parseArgsConfig parses the command line and if need a config file.
-func parseArgsConfig() ([]string, *config, error) {
+// ParseArgsConfig parses the command line and if need a config file.
+func ParseArgsConfig() ([]string, *Config, error) {
 	var (
 		logFile  = defaultLogFile
 		logLevel = &options.LogLevel{Level: defaultLogLevel}
 	)
-	p := options.Parser[config]{
+	p := options.Parser[Config]{
 		DefaultConfigLocations: configPaths,
-		ConfigLocation:         func(cfg *config) string { return cfg.Config },
+		ConfigLocation:         func(cfg *Config) string { return cfg.Config },
 		Usage:                  "[OPTIONS] domain...",
-		HasVersion:             func(cfg *config) bool { return cfg.Version },
-		SetDefaults: func(cfg *config) {
+		HasVersion:             func(cfg *Config) bool { return cfg.Version },
+		SetDefaults: func(cfg *Config) {
 			cfg.Worker = defaultWorker
 			cfg.RemoteValidatorPresets = []string{defaultPreset}
 			cfg.ValidationMode = defaultValidationMode
@@ -107,7 +107,7 @@ func parseArgsConfig() ([]string, *config, error) {
 			cfg.LogLevel = logLevel
 		},
 		// Re-establish default values if not set.
-		EnsureDefaults: func(cfg *config) {
+		EnsureDefaults: func(cfg *Config) {
 			if cfg.Worker == 0 {
 				cfg.Worker = defaultWorker
 			}
@@ -152,18 +152,18 @@ func (vm *validationMode) UnmarshalFlag(value string) error {
 }
 
 // ignoreFile returns true if the given URL should not be downloaded.
-func (cfg *config) ignoreURL(u string) bool {
+func (cfg *Config) ignoreURL(u string) bool {
 	return cfg.ignorePattern.Matches(u)
 }
 
 // verbose is considered a log level equal or less debug.
-func (cfg *config) verbose() bool {
+func (cfg *Config) verbose() bool {
 	return cfg.LogLevel.Level <= slog.LevelDebug
 }
 
 // prepareDirectory ensures that the working directory
 // exists and is setup properly.
-func (cfg *config) prepareDirectory() error {
+func (cfg *Config) prepareDirectory() error {
 	// If not given use current working directory.
 	if cfg.Directory == "" {
 		dir, err := os.Getwd()
@@ -197,7 +197,7 @@ func dropSubSeconds(_ []string, a slog.Attr) slog.Attr {
 }
 
 // prepareLogging sets up the structured logging.
-func (cfg *config) prepareLogging() error {
+func (cfg *Config) prepareLogging() error {
 	var w io.Writer
 	if cfg.LogFile == nil || *cfg.LogFile == "" {
 		log.Println("using STDERR for logging")
@@ -230,7 +230,7 @@ func (cfg *config) prepareLogging() error {
 }
 
 // compileIgnorePatterns compiles the configure patterns to be ignored.
-func (cfg *config) compileIgnorePatterns() error {
+func (cfg *Config) compileIgnorePatterns() error {
 	pm, err := filter.NewPatternMatcher(cfg.IgnorePattern)
 	if err != nil {
 		return err
@@ -240,7 +240,7 @@ func (cfg *config) compileIgnorePatterns() error {
 }
 
 // prepareCertificates loads the client side certificates used by the HTTP client.
-func (cfg *config) prepareCertificates() error {
+func (cfg *Config) prepareCertificates() error {
 	cert, err := certs.LoadCertificate(
 		cfg.ClientCert, cfg.ClientKey, cfg.ClientPassphrase)
 	if err != nil {
@@ -251,12 +251,12 @@ func (cfg *config) prepareCertificates() error {
 }
 
 // prepare prepares internal state of a loaded configuration.
-func (cfg *config) prepare() error {
-	for _, prepare := range []func(*config) error{
-		(*config).prepareDirectory,
-		(*config).prepareLogging,
-		(*config).prepareCertificates,
-		(*config).compileIgnorePatterns,
+func (cfg *Config) Prepare() error {
+	for _, prepare := range []func(*Config) error{
+		(*Config).prepareDirectory,
+		(*Config).prepareLogging,
+		(*Config).prepareCertificates,
+		(*Config).compileIgnorePatterns,
 	} {
 		if err := prepare(cfg); err != nil {
 			return err
