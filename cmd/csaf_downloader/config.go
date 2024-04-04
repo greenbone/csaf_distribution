@@ -30,16 +30,16 @@ const (
 	defaultWorker         = 2
 	defaultPreset         = "mandatory"
 	defaultForwardQueue   = 5
-	defaultValidationMode = validationStrict
+	defaultValidationMode = ValidationStrict
 	defaultLogFile        = "downloader.log"
 	defaultLogLevel       = slog.LevelInfo
 )
 
-type validationMode string
+type ValidationMode string
 
 const (
-	validationStrict = validationMode("strict")
-	validationUnsafe = validationMode("unsafe")
+	ValidationStrict = ValidationMode("strict")
+	ValidationUnsafe = ValidationMode("unsafe")
 )
 
 type Config struct {
@@ -63,7 +63,7 @@ type Config struct {
 	RemoteValidatorPresets []string `long:"validator_preset" description:"One or more PRESETS to validate remotely" value-name:"PRESETS" toml:"validator_preset"`
 
 	//lint:ignore SA5008 We are using choice twice: strict, unsafe.
-	ValidationMode validationMode `long:"validation_mode" short:"m" choice:"strict" choice:"unsafe" value-name:"MODE" description:"MODE how strict the validation is" toml:"validation_mode"`
+	ValidationMode ValidationMode `long:"validation_mode" short:"m" choice:"strict" choice:"unsafe" value-name:"MODE" description:"MODE how strict the validation is" toml:"validation_mode"`
 
 	ForwardURL      string      `long:"forward_url" description:"URL of HTTP endpoint to forward downloads to" value-name:"URL" toml:"forward_url"`
 	ForwardHeader   http.Header `long:"forward_header" description:"One or more extra HTTP header fields used by forwarding" toml:"forward_header"`
@@ -117,9 +117,9 @@ func ParseArgsConfig() ([]string, *Config, error) {
 				cfg.RemoteValidatorPresets = []string{defaultPreset}
 			}
 			switch cfg.ValidationMode {
-			case validationStrict, validationUnsafe:
+			case ValidationStrict, ValidationUnsafe:
 			default:
-				cfg.ValidationMode = validationStrict
+				cfg.ValidationMode = ValidationStrict
 			}
 			if cfg.LogFile == nil {
 				cfg.LogFile = &logFile
@@ -133,9 +133,9 @@ func ParseArgsConfig() ([]string, *Config, error) {
 }
 
 // UnmarshalText implements [encoding.TextUnmarshaler].
-func (vm *validationMode) UnmarshalText(text []byte) error {
-	switch m := validationMode(text); m {
-	case validationStrict, validationUnsafe:
+func (vm *ValidationMode) UnmarshalText(text []byte) error {
+	switch m := ValidationMode(text); m {
+	case ValidationStrict, ValidationUnsafe:
 		*vm = m
 	default:
 		return fmt.Errorf(`invalid value %q (expected "strict" or "unsafe)"`, m)
@@ -144,8 +144,8 @@ func (vm *validationMode) UnmarshalText(text []byte) error {
 }
 
 // UnmarshalFlag implements [flags.UnmarshalFlag].
-func (vm *validationMode) UnmarshalFlag(value string) error {
-	var v validationMode
+func (vm *ValidationMode) UnmarshalFlag(value string) error {
+	var v ValidationMode
 	if err := v.UnmarshalText([]byte(value)); err != nil {
 		return err
 	}

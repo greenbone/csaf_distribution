@@ -627,7 +627,7 @@ nextAdvisory:
 			if err := check(); err != nil {
 				slog.Error("Validation check failed", "error", err)
 				valStatus.update(invalidValidationStatus)
-				if d.cfg.ValidationMode == validationStrict {
+				if d.cfg.ValidationMode == ValidationStrict {
 					continue nextAdvisory
 				}
 			}
