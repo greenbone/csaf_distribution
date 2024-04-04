@@ -76,7 +76,7 @@ type Config struct {
 
 	Config string `short:"c" long:"config" description:"Path to config TOML file" value-name:"TOML-FILE" toml:"-"`
 
-	clientCerts   []tls.Certificate
+	ClientCerts   []tls.Certificate
 	ignorePattern filter.PatternMatcher
 
 	ForwardChannel bool // forward the csafs via a channel (is not meant to be set via command line)
@@ -248,7 +248,7 @@ func (cfg *Config) prepareCertificates() error {
 	if err != nil {
 		return err
 	}
-	cfg.clientCerts = cert
+	cfg.ClientCerts = cert
 	return nil
 }
 
