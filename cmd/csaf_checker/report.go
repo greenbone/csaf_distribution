@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/csaf-poc/csaf_distribution/v3/csaf"
-	"github.com/csaf-poc/csaf_distribution/v3/internal/models"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/models"
 )
 
 // MessageType is the kind of the message.
