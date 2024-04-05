@@ -198,8 +198,8 @@ func dropSubSeconds(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-// prepareLogging sets up the structured logging.
-func (cfg *Config) prepareLogging() error {
+// PrepareLogging sets up the structured logging.
+func (cfg *Config) PrepareLogging() error {
 	var w io.Writer
 	if cfg.LogFile == nil || *cfg.LogFile == "" {
 		log.Println("using STDERR for logging")
@@ -256,7 +256,7 @@ func (cfg *Config) prepareCertificates() error {
 func (cfg *Config) Prepare() error {
 	for _, prepare := range []func(*Config) error{
 		(*Config).prepareDirectory,
-		(*Config).prepareLogging,
+		(*Config).PrepareLogging,
 		(*Config).prepareCertificates,
 		(*Config).compileIgnorePatterns,
 	} {
