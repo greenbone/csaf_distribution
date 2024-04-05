@@ -17,7 +17,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/csaf-poc/csaf_distribution/v3/cmd/csaf_downloader"
-	"github.com/csaf-poc/csaf_distribution/v3/internal/options"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
 )
 
 func run(cfg *csaf_downloader.Config, domains []string) error {

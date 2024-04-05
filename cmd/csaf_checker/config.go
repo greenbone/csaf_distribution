@@ -15,8 +15,8 @@ import (
 
 	"github.com/csaf-poc/csaf_distribution/v3/internal/certs"
 	"github.com/csaf-poc/csaf_distribution/v3/internal/filter"
-	"github.com/csaf-poc/csaf_distribution/v3/internal/options"
 	"github.com/csaf-poc/csaf_distribution/v3/pkg/models"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
 )
 
 type outputFormat string
