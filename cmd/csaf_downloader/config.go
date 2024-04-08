@@ -78,6 +78,8 @@ type Config struct {
 
 	clientCerts   []tls.Certificate
 	ignorePattern filter.PatternMatcher
+
+	ForwardChannel bool // forward the csafs via a channel (is not meant to be set via command line)
 }
 
 // configPaths are the potential file locations of the config file.

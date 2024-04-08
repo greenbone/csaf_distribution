@@ -47,6 +47,7 @@ type Downloader struct {
 	mkdirMu   sync.Mutex
 	statsMu   sync.Mutex
 	stats     stats
+	Csafs     chan []byte
 }
 
 // failedValidationDir is the name of the sub folder
@@ -76,6 +77,7 @@ func NewDownloader(cfg *Config) (*Downloader, error) {
 		cfg:       cfg,
 		eval:      util.NewPathEval(),
 		validator: validator,
+		Csafs:     make(chan []byte),
 	}, nil
 }
 
@@ -84,6 +86,7 @@ func (d *Downloader) Close() {
 		d.validator.Close()
 		d.validator = nil
 	}
+	close(d.Csafs)
 }
 
 // addStats add stats to total stats
@@ -612,6 +615,10 @@ nextAdvisory:
 				valStatus,
 				string(s256Data),
 				string(s512Data))
+		}
+
+		if d.cfg.ForwardChannel {
+			d.Csafs <- data.Bytes()
 		}
 
 		if d.cfg.NoStore {
