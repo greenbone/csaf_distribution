@@ -529,7 +529,7 @@ nextAdvisory:
 		s256Check := func() error {
 			if s256 != nil && !bytes.Equal(s256.Sum(nil), remoteSHA256) {
 				stats.sha256Failed++
-				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("SHA256 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("SHA256 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
 				return fmt.Errorf("SHA256 checksum of %s does not match", file.URL())
 			}
 			return nil
@@ -538,7 +538,7 @@ nextAdvisory:
 		s512Check := func() error {
 			if s512 != nil && !bytes.Equal(s512.Sum(nil), remoteSHA512) {
 				stats.sha512Failed++
-				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("SHA512 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("SHA512 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
 				return fmt.Errorf("SHA512 checksum of %s does not match", file.URL())
 			}
 			return nil
@@ -561,7 +561,7 @@ nextAdvisory:
 				if err := d.checkSignature(data.Bytes(), sign); err != nil {
 					if !d.cfg.IgnoreSignatureCheck {
 						stats.signatureFailed++
-						errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("cannot verify signature for CSAF document ", filename, " at URL ", file.URL(), ": ", err)}
+						errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("cannot verify signature for CSAF document ", filename, " at URL ", file.URL(), ": ", err)}
 						return fmt.Errorf("cannot verify signature for %s: %v", file.URL(), err)
 					}
 				}
