@@ -2,11 +2,10 @@ name: Go
 
 on:
   push:
-    paths:
-      - "**.go"
+    branches:
+      - main
   pull_request:
-    paths:
-      - "**.go"
+  workflow_dispatch:
 
 jobs:
   build:
