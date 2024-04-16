@@ -1,0 +1,6 @@
+# default reviewers
+*                   @greenbone/vulnerability-intelligence-maintainers
+
+# github actions & settings
+/.github/           @greenbone/devops @greenbone/vulnerability-intelligence-maintainers
+
