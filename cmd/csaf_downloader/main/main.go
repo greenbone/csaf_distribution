@@ -16,15 +16,16 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/csaf-poc/csaf_distribution/v3/internal/options"
+	"github.com/csaf-poc/csaf_distribution/v3/cmd/csaf_downloader"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
 )
 
-func run(cfg *config, domains []string) error {
-	d, err := newDownloader(cfg)
+func run(cfg *csaf_downloader.Config, domains []string) error {
+	d, err := csaf_downloader.NewDownloader(cfg)
 	if err != nil {
 		return err
 	}
-	defer d.close()
+	defer d.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -32,23 +33,23 @@ func run(cfg *config, domains []string) error {
 	defer stop()
 
 	if cfg.ForwardURL != "" {
-		f := newForwarder(cfg)
-		go f.run()
+		f := csaf_downloader.NewForwarder(cfg)
+		go f.Run()
 		defer func() {
-			f.log()
-			f.close()
+			f.Log()
+			f.Close()
 		}()
-		d.forwarder = f
+		d.Forwarder = f
 	}
 
-	return d.run(ctx, domains)
+	return d.Run(ctx, domains)
 }
 
 func main() {
 
-	domains, cfg, err := parseArgsConfig()
+	domains, cfg, err := csaf_downloader.ParseArgsConfig()
 	options.ErrorCheck(err)
-	options.ErrorCheck(cfg.prepare())
+	options.ErrorCheck(cfg.Prepare())
 
 	if len(domains) == 0 {
 		slog.Warn("No domains given.")

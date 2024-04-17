@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2022, 2023 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022, 2023 Intevation GmbH <https://intevation.de>
 
-package main
+package csaf_downloader
 
 import (
 	"bytes"
@@ -15,7 +15,6 @@ import (
 	"crypto/sha512"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -35,18 +34,20 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/csaf-poc/csaf_distribution/v3/csaf"
+	csafErrs "github.com/csaf-poc/csaf_distribution/v3/pkg/errs"
 	"github.com/csaf-poc/csaf_distribution/v3/util"
 )
 
-type downloader struct {
-	cfg       *config
+type Downloader struct {
+	cfg       *Config
 	keys      *crypto.KeyRing
 	eval      *util.PathEval
 	validator csaf.RemoteValidator
-	forwarder *forwarder
+	Forwarder *Forwarder
 	mkdirMu   sync.Mutex
 	statsMu   sync.Mutex
 	stats     stats
+	Csafs     chan []byte
 }
 
 // failedValidationDir is the name of the sub folder
@@ -54,7 +55,7 @@ type downloader struct {
 // unsafe mode.
 const failedValidationDir = "failed_validation"
 
-func newDownloader(cfg *config) (*downloader, error) {
+func NewDownloader(cfg *Config) (*Downloader, error) {
 
 	var validator csaf.RemoteValidator
 
@@ -72,22 +73,24 @@ func newDownloader(cfg *config) (*downloader, error) {
 		validator = csaf.SynchronizedRemoteValidator(validator)
 	}
 
-	return &downloader{
+	return &Downloader{
 		cfg:       cfg,
 		eval:      util.NewPathEval(),
 		validator: validator,
+		Csafs:     make(chan []byte),
 	}, nil
 }
 
-func (d *downloader) close() {
+func (d *Downloader) Close() {
 	if d.validator != nil {
 		d.validator.Close()
 		d.validator = nil
 	}
+	close(d.Csafs)
 }
 
 // addStats add stats to total stats
-func (d *downloader) addStats(o *stats) {
+func (d *Downloader) addStats(o *stats) {
 	d.statsMu.Lock()
 	defer d.statsMu.Unlock()
 	d.stats.add(o)
@@ -105,7 +108,7 @@ func logRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-func (d *downloader) httpClient() util.Client {
+func (d *Downloader) httpClient() util.Client {
 
 	hClient := http.Client{}
 
@@ -118,8 +121,8 @@ func (d *downloader) httpClient() util.Client {
 		tlsConfig.InsecureSkipVerify = true
 	}
 
-	if len(d.cfg.clientCerts) != 0 {
-		tlsConfig.Certificates = d.cfg.clientCerts
+	if len(d.cfg.ClientCerts) != 0 {
+		tlsConfig.Certificates = d.cfg.ClientCerts
 	}
 
 	hClient.Transport = &http.Transport{
@@ -165,7 +168,7 @@ func httpLog(who string) func(string, string) {
 	}
 }
 
-func (d *downloader) download(ctx context.Context, domain string) error {
+func (d *Downloader) download(ctx context.Context, domain string) error {
 	client := d.httpClient()
 
 	loader := csaf.NewProviderMetadataLoader(client)
@@ -215,7 +218,7 @@ func (d *downloader) download(ctx context.Context, domain string) error {
 	})
 }
 
-func (d *downloader) downloadFiles(
+func (d *Downloader) downloadFiles(
 	ctx context.Context,
 	label csaf.TLPLabel,
 	files []csaf.AdvisoryFile,
@@ -261,10 +264,13 @@ allFiles:
 	close(errorCh)
 	<-errDone
 
-	return errors.Join(errs...)
+	if len(errs) > 0 {
+		return &csafErrs.CompositeErrCsafDownload{Errs: errs}
+	}
+	return nil
 }
 
-func (d *downloader) loadOpenPGPKeys(
+func (d *Downloader) loadOpenPGPKeys(
 	client util.Client,
 	doc any,
 	base *url.URL,
@@ -355,7 +361,7 @@ func (d *downloader) loadOpenPGPKeys(
 }
 
 // logValidationIssues logs the issues reported by the advisory schema validation.
-func (d *downloader) logValidationIssues(url string, errors []string, err error) {
+func (d *Downloader) logValidationIssues(url string, errors []string, err error) {
 	if err != nil {
 		slog.Error("Failed to validate",
 			"url", url,
@@ -375,7 +381,7 @@ func (d *downloader) logValidationIssues(url string, errors []string, err error)
 	}
 }
 
-func (d *downloader) downloadWorker(
+func (d *Downloader) downloadWorker(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	label csaf.TLPLabel,
@@ -428,6 +434,7 @@ nextAdvisory:
 		filename := filepath.Base(u.Path)
 		if !util.ConformingFileName(filename) {
 			stats.filenameFailed++
+			errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("CSAF has non conforming filename ", filename)}
 			slog.Warn("Ignoring none conforming filename",
 				"filename", filename)
 			continue
@@ -436,6 +443,7 @@ nextAdvisory:
 		resp, err := client.Get(file.URL())
 		if err != nil {
 			stats.downloadFailed++
+			errorCh <- csafErrs.ErrNetwork{Message: fmt.Sprint("can't retrieve CSAF document ", filename, " from URL", file.URL(), ":", err)}
 			slog.Warn("Cannot GET",
 				"url", file.URL(),
 				"error", err)
@@ -443,6 +451,16 @@ nextAdvisory:
 		}
 
 		if resp.StatusCode != http.StatusOK {
+			switch {
+			case resp.StatusCode == http.StatusUnauthorized:
+				errorCh <- csafErrs.ErrInvalidCredentials{Message: fmt.Sprint("invalid credentials to retrieve CSAF document ", filename, " at URL ", file.URL(), ": ", resp.Status)}
+			case resp.StatusCode == http.StatusNotFound:
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("could not find CSAF document '", filename, "' listed in table of content at URL ", file.URL(), ": ", resp.Status)}
+			case resp.StatusCode >= 500:
+				errorCh <- fmt.Errorf("could not retrieve CSAF document %s at URL %s: %s %w", filename, file.URL(), resp.Status, csafErrs.ErrRetryable) // mark as retryable error
+			default:
+				errorCh <- fmt.Errorf("could not retrieve CSAF document %s at URL %s: %s", filename, file.URL(), resp.Status)
+			}
 			stats.downloadFailed++
 			slog.Warn("Cannot load",
 				"url", file.URL(),
@@ -500,6 +518,7 @@ nextAdvisory:
 			return json.NewDecoder(tee).Decode(&doc)
 		}(); err != nil {
 			stats.downloadFailed++
+			errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("CSAF document ", filename, " at URL ", file.URL(), " is not valid json:", err)}
 			slog.Warn("Downloading failed",
 				"url", file.URL(),
 				"error", err)
@@ -510,6 +529,7 @@ nextAdvisory:
 		s256Check := func() error {
 			if s256 != nil && !bytes.Equal(s256.Sum(nil), remoteSHA256) {
 				stats.sha256Failed++
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("SHA256 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
 				return fmt.Errorf("SHA256 checksum of %s does not match", file.URL())
 			}
 			return nil
@@ -518,6 +538,7 @@ nextAdvisory:
 		s512Check := func() error {
 			if s512 != nil && !bytes.Equal(s512.Sum(nil), remoteSHA512) {
 				stats.sha512Failed++
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("SHA512 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
 				return fmt.Errorf("SHA512 checksum of %s does not match", file.URL())
 			}
 			return nil
@@ -540,6 +561,7 @@ nextAdvisory:
 				if err := d.checkSignature(data.Bytes(), sign); err != nil {
 					if !d.cfg.IgnoreSignatureCheck {
 						stats.signatureFailed++
+						errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("cannot verify signature for CSAF document ", filename, " at URL ", file.URL(), ": ", err)}
 						return fmt.Errorf("cannot verify signature for %s: %v", file.URL(), err)
 					}
 				}
@@ -551,6 +573,11 @@ nextAdvisory:
 		schemaCheck := func() error {
 			if errors, err := csaf.ValidateCSAF(doc); err != nil || len(errors) > 0 {
 				stats.schemaFailed++
+				if err != nil {
+					errorCh <- fmt.Errorf("schema validation for CSAF document %s failed: %w", filename, err)
+				} else {
+					errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("CSAF document ", filename, " at URL ", file.URL(), " does not conform to JSON schema:", errors)}
+				}
 				d.logValidationIssues(file.URL(), errors, err)
 				return fmt.Errorf("schema validation for %q failed", file.URL())
 			}
@@ -561,6 +588,7 @@ nextAdvisory:
 		filenameCheck := func() error {
 			if err := util.IDMatchesFilename(d.eval, doc, filename); err != nil {
 				stats.filenameFailed++
+				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("invalid CSAF document ", filename, " at URL ", file.URL(), ":", err)}
 				return fmt.Errorf("filename not conforming %s: %s", file.URL(), err)
 			}
 			return nil
@@ -580,6 +608,7 @@ nextAdvisory:
 			}
 			if !rvr.Valid {
 				stats.remoteFailed++
+				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("remote validation of CSAF document ", filename, " at URL ", file.URL(), " failed")}
 				return fmt.Errorf("remote validation of %q failed", file.URL())
 			}
 			return nil
@@ -598,7 +627,7 @@ nextAdvisory:
 			if err := check(); err != nil {
 				slog.Error("Validation check failed", "error", err)
 				valStatus.update(invalidValidationStatus)
-				if d.cfg.ValidationMode == validationStrict {
+				if d.cfg.ValidationMode == ValidationStrict {
 					continue nextAdvisory
 				}
 			}
@@ -606,12 +635,16 @@ nextAdvisory:
 		valStatus.update(validValidationStatus)
 
 		// Send to forwarder
-		if d.forwarder != nil {
-			d.forwarder.forward(
+		if d.Forwarder != nil {
+			d.Forwarder.forward(
 				filename, data.String(),
 				valStatus,
 				string(s256Data),
 				string(s512Data))
+		}
+
+		if d.cfg.ForwardChannel {
+			d.Csafs <- data.Bytes()
 		}
 
 		if d.cfg.NoStore {
@@ -680,13 +713,13 @@ nextAdvisory:
 	}
 }
 
-func (d *downloader) mkdirAll(path string, perm os.FileMode) error {
+func (d *Downloader) mkdirAll(path string, perm os.FileMode) error {
 	d.mkdirMu.Lock()
 	defer d.mkdirMu.Unlock()
 	return os.MkdirAll(path, perm)
 }
 
-func (d *downloader) checkSignature(data []byte, sign *crypto.PGPSignature) error {
+func (d *Downloader) checkSignature(data []byte, sign *crypto.PGPSignature) error {
 	pm := crypto.NewPlainMessage(data)
 	t := crypto.GetUnixTime()
 	return d.keys.VerifyDetached(pm, sign, t)
@@ -733,7 +766,7 @@ func loadHash(client util.Client, p string) ([]byte, []byte, error) {
 }
 
 // run performs the downloads for all the given domains.
-func (d *downloader) run(ctx context.Context, domains []string) error {
+func (d *Downloader) Run(ctx context.Context, domains []string) error {
 	defer d.stats.log()
 	for _, domain := range domains {
 		if err := d.download(ctx, domain); err != nil {

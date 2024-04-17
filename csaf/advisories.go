@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/errs"
 	"github.com/csaf-poc/csaf_distribution/v3/util"
 )
 
@@ -255,6 +256,7 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 	labeledFeeds []Feed,
 	fn func(TLPLabel, []AdvisoryFile) error,
 ) error {
+	var feedErrs []error
 	for i := range labeledFeeds {
 		feed := &labeledFeeds[i]
 		if feed.URL == nil {
@@ -263,6 +265,7 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		up, err := url.Parse(string(*feed.URL))
 		if err != nil {
 			log.Printf("Invalid URL %s in feed: %v.", *feed.URL, err)
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("invalid feed URL", *feed.URL, ":", err)})
 			continue
 		}
 		feedURL := afp.base.ResolveReference(up)
@@ -271,22 +274,37 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		fb, err := util.BaseURL(feedURL)
 		if err != nil {
 			log.Printf("error: Invalid feed base URL '%s': %v\n", fb, err)
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("invalid feed base URL ", fb, ":", err)})
 			continue
 		}
 		feedBaseURL, err := url.Parse(fb)
 		if err != nil {
 			log.Printf("error: Cannot parse feed base URL '%s': %v\n", fb, err)
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("cannot parse feed base URL ", fb, ":", err)})
 			continue
 		}
 
 		res, err := afp.client.Get(feedURL.String())
 		if err != nil {
 			log.Printf("error: Cannot get feed '%s'\n", err)
+			feedErrs = append(feedErrs, errs.ErrNetwork{Message: fmt.Sprint("cannot get feed ", feedURL.String(), ":", err)})
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
 			log.Printf("error: Fetching %s failed. Status code %d (%s)",
 				feedURL, res.StatusCode, res.Status)
+			switch {
+			case res.StatusCode == http.StatusUnauthorized:
+				feedErrs = append(feedErrs, errs.ErrInvalidCredentials{Message: fmt.Sprint("invalid credentials to retrieve ROLIE feed ", feedURL.String(), ": ", res.Status)})
+			case res.StatusCode == http.StatusNotFound:
+				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("could not find ROLIE feed ", feedURL.String(), ": ", res.Status)})
+			case res.StatusCode == http.StatusForbidden:
+				// user has insufficient permissions to access feed, no error
+			case res.StatusCode > 500:
+				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve ROLIE feed %s: %s %w", feedURL.String(), res.Status, errs.ErrRetryable)) // mark error as retryable
+			default:
+				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve ROLIE feed %s: %s", feedURL.String(), res.Status))
+			}
 			continue
 		}
 		rfeed, err := func() (*ROLIEFeed, error) {
@@ -295,21 +313,22 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		}()
 		if err != nil {
 			log.Printf("Loading ROLIE feed failed: %v.", err)
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("ROLIE feed ", feedURL.String(), " is not valid JSON:", err)})
 			continue
 		}
 
 		var files []AdvisoryFile
 
-		resolve := func(u string) string {
+		resolve := func(u string) (string, error) {
 			if u == "" {
-				return ""
+				return "", errs.ErrCsafProviderIssue{Message: "empty url in ROLIE feed to file"}
 			}
 			p, err := url.Parse(u)
 			if err != nil {
 				log.Printf("error: Invalid URL '%s': %v", u, err)
-				return ""
+				return "", errs.ErrCsafProviderIssue{Message: fmt.Sprint("invalid url in ROLIE feed to file", u, ":", err)}
 			}
-			return feedBaseURL.ResolveReference(p).String()
+			return feedBaseURL.ResolveReference(p).String(), nil
 		}
 
 		rfeed.Entries(func(entry *Entry) {
@@ -323,26 +342,41 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 
 			var self, sha256, sha512, sign string
 
+			var csafLinkExists bool
 			for i := range entry.Link {
 				link := &entry.Link[i]
 				lower := strings.ToLower(link.HRef)
 				switch link.Rel {
 				case "self":
-					self = resolve(link.HRef)
+					csafLinkExists = true
+					self, err = resolve(link.HRef)
+					if err != nil {
+						feedErrs = append(feedErrs, err)
+						return
+					}
 				case "signature":
-					sign = resolve(link.HRef)
+					sign, err = resolve(link.HRef)
+					if err != nil {
+						feedErrs = append(feedErrs, err)
+					}
 				case "hash":
 					switch {
 					case strings.HasSuffix(lower, ".sha256"):
-						sha256 = resolve(link.HRef)
+						sha256, err = resolve(link.HRef)
+						if err != nil {
+							feedErrs = append(feedErrs, err)
+						}
 					case strings.HasSuffix(lower, ".sha512"):
-						sha512 = resolve(link.HRef)
+						sha512, err = resolve(link.HRef)
+						if err != nil {
+							feedErrs = append(feedErrs, err)
+						}
 					}
 				}
 			}
 
-			if self == "" {
-				return
+			if !csafLinkExists {
+				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("ROLIE feed ", feedURL.String(), " contains entry (ID '", entry.ID, "') without link to csaf document")})
 			}
 
 			var file AdvisoryFile
@@ -364,8 +398,11 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		}
 
 		if err := fn(label, files); err != nil {
-			return err
+			feedErrs = append(feedErrs, err)
 		}
+	}
+	if len(feedErrs) > 0 {
+		return &errs.CompositeErrRolieFeed{Errs: feedErrs}
 	}
 	return nil
 }
