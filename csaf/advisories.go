@@ -262,10 +262,18 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		if feed.URL == nil {
 			continue
 		}
+
+		var label TLPLabel
+		if feed.TLPLabel != nil {
+			label = *feed.TLPLabel
+		} else {
+			label = "unknown"
+		}
+
 		up, err := url.Parse(string(*feed.URL))
 		if err != nil {
 			log.Printf("Invalid URL %s in feed: %v.", *feed.URL, err)
-			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("invalid feed URL", *feed.URL, ":", err)})
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid TLP:%s feed URL %s: %v", label, *feed.URL, err)})
 			continue
 		}
 		feedURL := afp.base.ResolveReference(up)
@@ -274,20 +282,20 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		fb, err := util.BaseURL(feedURL)
 		if err != nil {
 			log.Printf("error: Invalid feed base URL '%s': %v\n", fb, err)
-			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("invalid feed base URL ", fb, ":", err)})
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid TLP:%s feed base URL %s: %v", label, fb, err)})
 			continue
 		}
 		feedBaseURL, err := url.Parse(fb)
 		if err != nil {
 			log.Printf("error: Cannot parse feed base URL '%s': %v\n", fb, err)
-			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("cannot parse feed base URL ", fb, ":", err)})
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("cannot parse TLP:%s feed base URL %s: %v", label, fb, err)})
 			continue
 		}
 
 		res, err := afp.client.Get(feedURL.String())
 		if err != nil {
 			log.Printf("error: Cannot get feed '%s'\n", err)
-			feedErrs = append(feedErrs, errs.ErrNetwork{Message: fmt.Sprint("cannot get feed ", feedURL.String(), ":", err)})
+			feedErrs = append(feedErrs, errs.ErrNetwork{Message: fmt.Sprintf("failed get for TLP:%s feed url %s: %v", label, feedURL.String(), err)})
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
@@ -295,15 +303,15 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 				feedURL, res.StatusCode, res.Status)
 			switch {
 			case res.StatusCode == http.StatusUnauthorized:
-				feedErrs = append(feedErrs, errs.ErrInvalidCredentials{Message: fmt.Sprint("invalid credentials to retrieve ROLIE feed ", feedURL.String(), ": ", res.Status)})
+				feedErrs = append(feedErrs, errs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials for TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
 			case res.StatusCode == http.StatusNotFound:
-				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("could not find ROLIE feed ", feedURL.String(), ": ", res.Status)})
+				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not find TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
 			case res.StatusCode == http.StatusForbidden:
 				// user has insufficient permissions to access feed, no error
 			case res.StatusCode > 500:
-				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve ROLIE feed %s: %s %w", feedURL.String(), res.Status, errs.ErrRetryable)) // mark error as retryable
+				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve TLP:%s ROLIE feed at %s: %s %w", label, feedURL.String(), res.Status, errs.ErrRetryable)) // mark error as retryable
 			default:
-				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve ROLIE feed %s: %s", feedURL.String(), res.Status))
+				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status))
 			}
 			continue
 		}
@@ -313,7 +321,7 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		}()
 		if err != nil {
 			log.Printf("Loading ROLIE feed failed: %v.", err)
-			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("ROLIE feed ", feedURL.String(), " is not valid JSON:", err)})
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("TLP:%s ROLIE feed at %s is not valid JSON: %v", label, feedURL.String(), err)})
 			continue
 		}
 
@@ -321,12 +329,12 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 
 		resolve := func(u string) (string, error) {
 			if u == "" {
-				return "", errs.ErrCsafProviderIssue{Message: "empty url in ROLIE feed to file"}
+				return "", errs.ErrCsafProviderIssue{Message: fmt.Sprintf("empty url in TLP:%s ROLIE feed at %s to file", label, feedURL.String())}
 			}
 			p, err := url.Parse(u)
 			if err != nil {
 				log.Printf("error: Invalid URL '%s': %v", u, err)
-				return "", errs.ErrCsafProviderIssue{Message: fmt.Sprint("invalid url in ROLIE feed to file", u, ":", err)}
+				return "", errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid url in TLP:%s ROLIE feed at %s to file %s: %v", label, feedURL.String(), u, err)}
 			}
 			return feedBaseURL.ResolveReference(p).String(), nil
 		}
@@ -376,7 +384,7 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			}
 
 			if !csafLinkExists {
-				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprint("ROLIE feed ", feedURL.String(), " contains entry (ID '", entry.ID, "') without link to csaf document")})
+				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("TLP:%s ROLIE feed at %s contains entry (ID '%s') without link to csaf document", label, feedURL.String(), entry.ID)})
 			}
 
 			var file AdvisoryFile
@@ -389,13 +397,6 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 
 			files = append(files, file)
 		})
-
-		var label TLPLabel
-		if feed.TLPLabel != nil {
-			label = *feed.TLPLabel
-		} else {
-			label = "unknown"
-		}
 
 		if err := fn(label, files); err != nil {
 			feedErrs = append(feedErrs, err)
