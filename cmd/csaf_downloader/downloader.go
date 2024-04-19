@@ -34,6 +34,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/csaf-poc/csaf_distribution/v3/csaf"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/errs"
 	csafErrs "github.com/csaf-poc/csaf_distribution/v3/pkg/errs"
 	"github.com/csaf-poc/csaf_distribution/v3/util"
 )
@@ -184,12 +185,12 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 	}
 
 	if !lpmd.Valid() {
-		return fmt.Errorf("no valid provider-metadata.json found for '%s'", domain)
+		return errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no valid provider-metadata.json found for '%s'", domain)}
 	}
 
 	base, err := url.Parse(lpmd.URL)
 	if err != nil {
-		return fmt.Errorf("invalid URL '%s': %v", lpmd.URL, err)
+		return errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid URL '%s': %v", lpmd.URL, err)}
 	}
 
 	if err := d.loadOpenPGPKeys(
@@ -197,7 +198,7 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 		lpmd.Document,
 		base,
 	); err != nil {
-		return err
+		return errs.ErrCsafProviderIssue{Message: err.Error()}
 	}
 
 	afp := csaf.NewAdvisoryFileProcessor(
