@@ -434,7 +434,7 @@ nextAdvisory:
 		filename := filepath.Base(u.Path)
 		if !util.ConformingFileName(filename) {
 			stats.filenameFailed++
-			errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("CSAF has non conforming filename ", filename)}
+			errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprintf("CSAF has non conforming filename %s", filename)}
 			slog.Warn("Ignoring none conforming filename",
 				"filename", filename)
 			continue
@@ -443,7 +443,7 @@ nextAdvisory:
 		resp, err := client.Get(file.URL())
 		if err != nil {
 			stats.downloadFailed++
-			errorCh <- csafErrs.ErrNetwork{Message: fmt.Sprint("can't retrieve CSAF document ", filename, " from URL", file.URL(), ":", err)}
+			errorCh <- csafErrs.ErrNetwork{Message: fmt.Sprintf("can't retrieve CSAF document %s from URL %s: %v", filename, file.URL(), err)}
 			slog.Warn("Cannot GET",
 				"url", file.URL(),
 				"error", err)
@@ -453,9 +453,9 @@ nextAdvisory:
 		if resp.StatusCode != http.StatusOK {
 			switch {
 			case resp.StatusCode == http.StatusUnauthorized:
-				errorCh <- csafErrs.ErrInvalidCredentials{Message: fmt.Sprint("invalid credentials to retrieve CSAF document ", filename, " at URL ", file.URL(), ": ", resp.Status)}
+				errorCh <- csafErrs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials to retrieve CSAF document %s at URL %s: %s", filename, file.URL(), resp.Status)}
 			case resp.StatusCode == http.StatusNotFound:
-				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("could not find CSAF document '", filename, "' listed in table of content at URL ", file.URL(), ": ", resp.Status)}
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not find CSAF document %s listed in table of content at URL %s: %s ", filename, file.URL(), resp.Status)}
 			case resp.StatusCode >= 500:
 				errorCh <- fmt.Errorf("could not retrieve CSAF document %s at URL %s: %s %w", filename, file.URL(), resp.Status, csafErrs.ErrRetryable) // mark as retryable error
 			default:
@@ -518,7 +518,7 @@ nextAdvisory:
 			return json.NewDecoder(tee).Decode(&doc)
 		}(); err != nil {
 			stats.downloadFailed++
-			errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("CSAF document ", filename, " at URL ", file.URL(), " is not valid json:", err)}
+			errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprintf("CSAF document %s at URL %s is not valid json: %v", filename, file.URL(), err)}
 			slog.Warn("Downloading failed",
 				"url", file.URL(),
 				"error", err)
@@ -529,7 +529,7 @@ nextAdvisory:
 		s256Check := func() error {
 			if s256 != nil && !bytes.Equal(s256.Sum(nil), remoteSHA256) {
 				stats.sha256Failed++
-				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("SHA256 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprintf("SHA256 checksum of CSAF document %s at URL %s does not match", filename, file.URL())}
 				return fmt.Errorf("SHA256 checksum of %s does not match", file.URL())
 			}
 			return nil
@@ -538,7 +538,7 @@ nextAdvisory:
 		s512Check := func() error {
 			if s512 != nil && !bytes.Equal(s512.Sum(nil), remoteSHA512) {
 				stats.sha512Failed++
-				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("SHA512 checksum of CSAF document ", filename, " at URL ", file.URL(), " does not match")}
+				errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprintf("SHA512 checksum of CSAF document %s at URL %s does not match", filename, file.URL())}
 				return fmt.Errorf("SHA512 checksum of %s does not match", file.URL())
 			}
 			return nil
@@ -561,7 +561,7 @@ nextAdvisory:
 				if err := d.checkSignature(data.Bytes(), sign); err != nil {
 					if !d.cfg.IgnoreSignatureCheck {
 						stats.signatureFailed++
-						errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprint("cannot verify signature for CSAF document ", filename, " at URL ", file.URL(), ": ", err)}
+						errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprintf("cannot verify signature for CSAF document %s at URL %s: %v", filename, file.URL(), err)}
 						return fmt.Errorf("cannot verify signature for %s: %v", file.URL(), err)
 					}
 				}
@@ -576,7 +576,7 @@ nextAdvisory:
 				if err != nil {
 					errorCh <- fmt.Errorf("schema validation for CSAF document %s failed: %w", filename, err)
 				} else {
-					errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("CSAF document ", filename, " at URL ", file.URL(), " does not conform to JSON schema:", errors)}
+					errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprintf("CSAF document %s at URL %s does not conform to JSON schema: %v", filename, file.URL(), errors)}
 				}
 				d.logValidationIssues(file.URL(), errors, err)
 				return fmt.Errorf("schema validation for %q failed", file.URL())
@@ -588,7 +588,7 @@ nextAdvisory:
 		filenameCheck := func() error {
 			if err := util.IDMatchesFilename(d.eval, doc, filename); err != nil {
 				stats.filenameFailed++
-				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("invalid CSAF document ", filename, " at URL ", file.URL(), ":", err)}
+				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprintf("invalid CSAF document %s at URL %s: %v", filename, file.URL(), err)}
 				return fmt.Errorf("filename not conforming %s: %s", file.URL(), err)
 			}
 			return nil
@@ -608,7 +608,7 @@ nextAdvisory:
 			}
 			if !rvr.Valid {
 				stats.remoteFailed++
-				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprint("remote validation of CSAF document ", filename, " at URL ", file.URL(), " failed")}
+				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprintf("remote validation of CSAF document %s at URL %s failed", filename, file.URL())}
 				return fmt.Errorf("remote validation of %q failed", file.URL())
 			}
 			return nil
