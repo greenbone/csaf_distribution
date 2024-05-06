@@ -7,7 +7,7 @@ require (
 	github.com/Intevation/gval v1.3.0
 	github.com/Intevation/jsonpath v0.2.1
 	github.com/ProtonMail/gopenpgp/v2 v2.7.5
-	github.com/PuerkitoBio/goquery v1.9.1
+	github.com/PuerkitoBio/goquery v1.9.2
 	github.com/gofrs/flock v0.8.1
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/mitchellh/go-homedir v1.1.0
@@ -16,7 +16,7 @@ require (
 	go.etcd.io/bbolt v1.3.9
 	golang.org/x/crypto v0.22.0
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
-	golang.org/x/term v0.19.0
+	golang.org/x/term v0.20.0
 	golang.org/x/time v0.5.0
 )
 
@@ -30,7 +30,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
