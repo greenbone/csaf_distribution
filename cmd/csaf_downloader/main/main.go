@@ -1,7 +1,7 @@
-// This file is Free Software under the MIT License
-// without warranty, see README.md and LICENSES/MIT.txt for details.
+// This file is Free Software under the Apache-2.0 License
+// without warranty, see README.md and LICENSES/Apache-2.0.txt for details.
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 //
 // SPDX-FileCopyrightText: 2022 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022 Intevation GmbH <https://intevation.de>
@@ -11,10 +11,9 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"os/signal"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/csaf-poc/csaf_distribution/v3/cmd/csaf_downloader"
 	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
@@ -42,6 +41,11 @@ func run(cfg *csaf_downloader.Config, domains []string) error {
 		d.Forwarder = f
 	}
 
+	// If the enumerate-only flag is set, enumerate found PMDs,
+	// else use the normal load method
+	if cfg.EnumeratePMDOnly {
+		return d.RunEnumerate(domains)
+	}
 	return d.Run(ctx, domains)
 }
 

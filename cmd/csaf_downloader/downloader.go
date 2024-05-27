@@ -1,7 +1,7 @@
-// This file is Free Software under the MIT License
-// without warranty, see README.md and LICENSES/MIT.txt for details.
+// This file is Free Software under the Apache-2.0 License
+// without warranty, see README.md and LICENSES/Apache-2.0.txt for details.
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 //
 // SPDX-FileCopyrightText: 2022, 2023 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022, 2023 Intevation GmbH <https://intevation.de>
@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,8 +28,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slog"
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
 	"golang.org/x/time/rate"
@@ -167,6 +166,36 @@ func httpLog(who string) func(string, string) {
 			"method", method,
 			"url", url)
 	}
+}
+
+func (d *Downloader) enumerate(domain string) error {
+	client := d.httpClient()
+
+	loader := csaf.NewProviderMetadataLoader(client)
+	lpmd := loader.Enumerate(domain)
+
+	docs := []any{}
+
+	for _, pmd := range lpmd {
+		if d.cfg.verbose() {
+			for i := range pmd.Messages {
+				slog.Debug("Enumerating provider-metadata.json",
+					"domain", domain,
+					"message", pmd.Messages[i].Message)
+			}
+		}
+
+		docs = append(docs, pmd.Document)
+	}
+
+	// print the results
+	doc, err := json.MarshalIndent(docs, "", "  ")
+	if err != nil {
+		slog.Error("Couldn't marshal PMD document json")
+	}
+	fmt.Println(string(doc))
+
+	return nil
 }
 
 func (d *Downloader) download(ctx context.Context, domain string) error {
@@ -771,6 +800,17 @@ func (d *Downloader) Run(ctx context.Context, domains []string) error {
 	defer d.stats.log()
 	for _, domain := range domains {
 		if err := d.download(ctx, domain); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// runEnumerate performs the enumeration of PMDs for all the given domains.
+func (d *Downloader) RunEnumerate(domains []string) error {
+	defer d.stats.log()
+	for _, domain := range domains {
+		if err := d.enumerate(domain); err != nil {
 			return err
 		}
 	}

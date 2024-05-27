@@ -1,7 +1,7 @@
-// This file is Free Software under the MIT License
-// without warranty, see README.md and LICENSES/MIT.txt for details.
+// This file is Free Software under the Apache-2.0 License
+// without warranty, see README.md and LICENSES/Apache-2.0.txt for details.
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 //
 // SPDX-FileCopyrightText: 2022 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022 Intevation GmbH <https://intevation.de>
@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,6 +25,7 @@ import (
 
 // AdvisoryFile constructs the urls of a remote file.
 type AdvisoryFile interface {
+	slog.LogValuer
 	URL() string
 	SHA256URL() string
 	SHA512URL() string
@@ -46,6 +48,11 @@ func (paf PlainAdvisoryFile) SHA512URL() string { return string(paf) + ".sha512"
 
 // SignURL returns the URL of signature file of this advisory.
 func (paf PlainAdvisoryFile) SignURL() string { return string(paf) + ".asc" }
+
+// LogValue implements [slog.LogValuer]
+func (paf PlainAdvisoryFile) LogValue() slog.Value {
+	return slog.GroupValue(slog.String("url", paf.URL()))
+}
 
 // HashedAdvisoryFile is a more involed version of checkFile.
 // Here each component can be given explicitly.
@@ -71,6 +78,11 @@ func (haf HashedAdvisoryFile) SHA512URL() string { return haf.name(2, ".sha512")
 
 // SignURL returns the URL of signature file of this advisory.
 func (haf HashedAdvisoryFile) SignURL() string { return haf.name(3, ".asc") }
+
+// LogValue implements [slog.LogValuer]
+func (haf HashedAdvisoryFile) LogValue() slog.Value {
+	return slog.GroupValue(slog.String("url", haf.URL()))
+}
 
 // AdvisoryFileProcessor implements the extraction of
 // advisory file names from a given provider metadata.

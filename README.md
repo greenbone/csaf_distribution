@@ -1,8 +1,18 @@
+<!--
+ This file is Free Software under the Apache-2.0 License
+ without warranty, see README.md and LICENSES/Apache-2.0.txt for details.
+
+ SPDX-License-Identifier: Apache-2.0
+
+ SPDX-FileCopyrightText: 2024 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
+ Software-Engineering: 2024 Intevation GmbH <https://intevation.de>
+-->
+
 # csaf_distribution
 
-An implementation of a [CSAF](https://csaf.io/)
-[2.0 Spec](https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html)
-([Errata](https://docs.oasis-open.org/csaf/csaf/v2.0/csaf-v2.0.html))
+Implements a [CSAF](https://csaf.io/)
+([specification v2.0](https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html)
+and its [errata](https://docs.oasis-open.org/csaf/csaf/v2.0/csaf-v2.0.html))
 trusted provider, checker, aggregator and downloader.
 Includes an uploader command line tool for the trusted provider.
 
@@ -59,7 +69,7 @@ Download the binaries from the most recent release assets on Github.
 
 ### Build from sources
 
-- A recent version of **Go** (1.20+) should be installed. [Go installation](https://go.dev/doc/install)
+- A recent version of **Go** (1.21+) should be installed. [Go installation](https://go.dev/doc/install)
 
 - Clone the repository `git clone https://github.com/csaf-poc/csaf_distribution.git `
 
@@ -90,7 +100,7 @@ For further details of the development process consult our [development page](./
 
 ## License
 
-- `csaf_distribution` is licensed as Free Software under MIT License.
+- `csaf_distribution` is licensed as Free Software under the terms of the [Apache License, Version 2.0](./LICENSES/Apache-2.0.txt).
 
 - See the specific source files
   for details, the license itself can be found in the directory `LICENSES/`.
