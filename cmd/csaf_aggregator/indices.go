@@ -1,7 +1,7 @@
-// This file is Free Software under the MIT License
-// without warranty, see README.md and LICENSES/MIT.txt for details.
+// This file is Free Software under the Apache-2.0 License
+// without warranty, see README.md and LICENSES/Apache-2.0.txt for details.
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 //
 // SPDX-FileCopyrightText: 2022 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022 Intevation GmbH <https://intevation.de>
@@ -12,7 +12,6 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -377,7 +376,7 @@ func (w *worker) writeIndices() error {
 	}
 
 	for label, summaries := range w.summaries {
-		log.Printf("%s: %d\n", label, len(summaries))
+		w.log.Debug("Writing indices", "label", label, "summaries.num", len(summaries))
 		if err := w.writeInterims(label, summaries); err != nil {
 			return err
 		}
