@@ -41,7 +41,6 @@ import (
 type Downloader struct {
 	cfg       *Config
 	keys      *crypto.KeyRing
-	eval      *util.PathEval
 	validator csaf.RemoteValidator
 	Forwarder *Forwarder
 	mkdirMu   sync.Mutex
@@ -75,7 +74,6 @@ func NewDownloader(cfg *Config) (*Downloader, error) {
 
 	return &Downloader{
 		cfg:       cfg,
-		eval:      util.NewPathEval(),
 		validator: validator,
 		Csafs:     make(chan []byte),
 	}, nil
@@ -205,7 +203,14 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 
 	lpmd := loader.Load(domain)
 
-	if d.cfg.verbose() {
+	if !lpmd.Valid() {
+		for i := range lpmd.Messages {
+			slog.Error("Loading provider-metadata.json",
+				"domain", domain,
+				"message", lpmd.Messages[i].Message)
+		}
+		return errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no valid provider-metadata.json found for '%s'", domain)}
+	} else if d.cfg.verbose() {
 		for i := range lpmd.Messages {
 			slog.Debug("Loading provider-metadata.json",
 				"domain", domain,
@@ -213,26 +218,25 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 		}
 	}
 
-	if !lpmd.Valid() {
-		return errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no valid provider-metadata.json found for '%s'", domain)}
-	}
-
 	base, err := url.Parse(lpmd.URL)
 	if err != nil {
 		return errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid URL '%s': %v", lpmd.URL, err)}
 	}
 
+	expr := util.NewPathEval()
+
 	if err := d.loadOpenPGPKeys(
 		client,
 		lpmd.Document,
 		base,
+		expr,
 	); err != nil {
 		return errs.ErrCsafProviderIssue{Message: err.Error()}
 	}
 
 	afp := csaf.NewAdvisoryFileProcessor(
 		client,
-		d.eval,
+		expr,
 		lpmd.Document,
 		base)
 
@@ -304,9 +308,10 @@ func (d *Downloader) loadOpenPGPKeys(
 	client util.Client,
 	doc any,
 	base *url.URL,
+	expr *util.PathEval,
 ) error {
 
-	src, err := d.eval.Eval("$.public_openpgp_keys", doc)
+	src, err := expr.Eval("$.public_openpgp_keys", doc)
 	if err != nil {
 		// no keys.
 		return nil
@@ -428,6 +433,7 @@ func (d *Downloader) downloadWorker(
 		dateExtract        = util.TimeMatcher(&initialReleaseDate, time.RFC3339)
 		lower              = strings.ToLower(string(label))
 		stats              = stats{}
+		expr               = util.NewPathEval()
 	)
 
 	// Add collected stats back to total.
@@ -616,7 +622,7 @@ nextAdvisory:
 
 		// Validate if filename is conforming.
 		filenameCheck := func() error {
-			if err := util.IDMatchesFilename(d.eval, doc, filename); err != nil {
+			if err := util.IDMatchesFilename(expr, doc, filename); err != nil {
 				stats.filenameFailed++
 				errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprintf("invalid CSAF document %s at URL %s: %v", filename, file.URL(), err)}
 				return fmt.Errorf("filename not conforming %s: %s", file.URL(), err)
@@ -685,7 +691,7 @@ nextAdvisory:
 			continue
 		}
 
-		if err := d.eval.Extract(
+		if err := expr.Extract(
 			`$.document.tracking.initial_release_date`, dateExtract, false, doc,
 		); err != nil {
 			slog.Warn("Cannot extract initial_release_date from advisory",
