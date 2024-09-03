@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2022 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2022 Intevation GmbH <https://intevation.de>
 
-package main
+package csaf_downloader
 
 import (
 	"crypto/tls"
@@ -21,27 +21,27 @@ import (
 
 	"github.com/csaf-poc/csaf_distribution/v3/internal/certs"
 	"github.com/csaf-poc/csaf_distribution/v3/internal/filter"
-	"github.com/csaf-poc/csaf_distribution/v3/internal/models"
-	"github.com/csaf-poc/csaf_distribution/v3/internal/options"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/models"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
 )
 
 const (
 	defaultWorker         = 2
 	defaultPreset         = "mandatory"
 	defaultForwardQueue   = 5
-	defaultValidationMode = validationStrict
+	defaultValidationMode = ValidationStrict
 	defaultLogFile        = "downloader.log"
 	defaultLogLevel       = slog.LevelInfo
 )
 
-type validationMode string
+type ValidationMode string
 
 const (
-	validationStrict = validationMode("strict")
-	validationUnsafe = validationMode("unsafe")
+	ValidationStrict = ValidationMode("strict")
+	ValidationUnsafe = ValidationMode("unsafe")
 )
 
-type config struct {
+type Config struct {
 	Directory            string            `short:"d" long:"directory" description:"DIRectory to store the downloaded files in" value-name:"DIR" toml:"directory"`
 	Insecure             bool              `long:"insecure" description:"Do not check TLS certificates from provider" toml:"insecure"`
 	IgnoreSignatureCheck bool              `long:"ignore_sigcheck" description:"Ignore signature check results, just warn on mismatch" toml:"ignore_sigcheck"`
@@ -64,7 +64,7 @@ type config struct {
 	RemoteValidatorPresets []string `long:"validator_preset" description:"One or more PRESETS to validate remotely" value-name:"PRESETS" toml:"validator_preset"`
 
 	//lint:ignore SA5008 We are using choice twice: strict, unsafe.
-	ValidationMode validationMode `long:"validation_mode" short:"m" choice:"strict" choice:"unsafe" value-name:"MODE" description:"MODE how strict the validation is" toml:"validation_mode"`
+	ValidationMode ValidationMode `long:"validation_mode" short:"m" choice:"strict" choice:"unsafe" value-name:"MODE" description:"MODE how strict the validation is" toml:"validation_mode"`
 
 	ForwardURL      string      `long:"forward_url" description:"URL of HTTP endpoint to forward downloads to" value-name:"URL" toml:"forward_url"`
 	ForwardHeader   http.Header `long:"forward_header" description:"One or more extra HTTP header fields used by forwarding" toml:"forward_header"`
@@ -77,8 +77,10 @@ type config struct {
 
 	Config string `short:"c" long:"config" description:"Path to config TOML file" value-name:"TOML-FILE" toml:"-"`
 
-	clientCerts   []tls.Certificate
+	ClientCerts   []tls.Certificate
 	ignorePattern filter.PatternMatcher
+
+	ForwardChannel bool // forward the csafs via a channel (is not meant to be set via command line)
 }
 
 // configPaths are the potential file locations of the config file.
@@ -88,18 +90,18 @@ var configPaths = []string{
 	"csaf_downloader.toml",
 }
 
-// parseArgsConfig parses the command line and if need a config file.
-func parseArgsConfig() ([]string, *config, error) {
+// ParseArgsConfig parses the command line and if need a config file.
+func ParseArgsConfig() ([]string, *Config, error) {
 	var (
 		logFile  = defaultLogFile
 		logLevel = &options.LogLevel{Level: defaultLogLevel}
 	)
-	p := options.Parser[config]{
+	p := options.Parser[Config]{
 		DefaultConfigLocations: configPaths,
-		ConfigLocation:         func(cfg *config) string { return cfg.Config },
+		ConfigLocation:         func(cfg *Config) string { return cfg.Config },
 		Usage:                  "[OPTIONS] domain...",
-		HasVersion:             func(cfg *config) bool { return cfg.Version },
-		SetDefaults: func(cfg *config) {
+		HasVersion:             func(cfg *Config) bool { return cfg.Version },
+		SetDefaults: func(cfg *Config) {
 			cfg.Worker = defaultWorker
 			cfg.RemoteValidatorPresets = []string{defaultPreset}
 			cfg.ValidationMode = defaultValidationMode
@@ -108,7 +110,7 @@ func parseArgsConfig() ([]string, *config, error) {
 			cfg.LogLevel = logLevel
 		},
 		// Re-establish default values if not set.
-		EnsureDefaults: func(cfg *config) {
+		EnsureDefaults: func(cfg *Config) {
 			if cfg.Worker == 0 {
 				cfg.Worker = defaultWorker
 			}
@@ -116,9 +118,9 @@ func parseArgsConfig() ([]string, *config, error) {
 				cfg.RemoteValidatorPresets = []string{defaultPreset}
 			}
 			switch cfg.ValidationMode {
-			case validationStrict, validationUnsafe:
+			case ValidationStrict, ValidationUnsafe:
 			default:
-				cfg.ValidationMode = validationStrict
+				cfg.ValidationMode = ValidationStrict
 			}
 			if cfg.LogFile == nil {
 				cfg.LogFile = &logFile
@@ -132,9 +134,9 @@ func parseArgsConfig() ([]string, *config, error) {
 }
 
 // UnmarshalText implements [encoding.TextUnmarshaler].
-func (vm *validationMode) UnmarshalText(text []byte) error {
-	switch m := validationMode(text); m {
-	case validationStrict, validationUnsafe:
+func (vm *ValidationMode) UnmarshalText(text []byte) error {
+	switch m := ValidationMode(text); m {
+	case ValidationStrict, ValidationUnsafe:
 		*vm = m
 	default:
 		return fmt.Errorf(`invalid value %q (expected "strict" or "unsafe)"`, m)
@@ -143,8 +145,8 @@ func (vm *validationMode) UnmarshalText(text []byte) error {
 }
 
 // UnmarshalFlag implements [flags.UnmarshalFlag].
-func (vm *validationMode) UnmarshalFlag(value string) error {
-	var v validationMode
+func (vm *ValidationMode) UnmarshalFlag(value string) error {
+	var v ValidationMode
 	if err := v.UnmarshalText([]byte(value)); err != nil {
 		return err
 	}
@@ -153,18 +155,18 @@ func (vm *validationMode) UnmarshalFlag(value string) error {
 }
 
 // ignoreFile returns true if the given URL should not be downloaded.
-func (cfg *config) ignoreURL(u string) bool {
+func (cfg *Config) ignoreURL(u string) bool {
 	return cfg.ignorePattern.Matches(u)
 }
 
 // verbose is considered a log level equal or less debug.
-func (cfg *config) verbose() bool {
+func (cfg *Config) verbose() bool {
 	return cfg.LogLevel.Level <= slog.LevelDebug
 }
 
 // prepareDirectory ensures that the working directory
 // exists and is setup properly.
-func (cfg *config) prepareDirectory() error {
+func (cfg *Config) prepareDirectory() error {
 	// If not given use current working directory.
 	if cfg.Directory == "" {
 		dir, err := os.Getwd()
@@ -197,8 +199,8 @@ func dropSubSeconds(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-// prepareLogging sets up the structured logging.
-func (cfg *config) prepareLogging() error {
+// PrepareLogging sets up the structured logging.
+func (cfg *Config) PrepareLogging() error {
 	var w io.Writer
 	if cfg.LogFile == nil || *cfg.LogFile == "" {
 		log.Println("using STDERR for logging")
@@ -231,7 +233,7 @@ func (cfg *config) prepareLogging() error {
 }
 
 // compileIgnorePatterns compiles the configure patterns to be ignored.
-func (cfg *config) compileIgnorePatterns() error {
+func (cfg *Config) compileIgnorePatterns() error {
 	pm, err := filter.NewPatternMatcher(cfg.IgnorePattern)
 	if err != nil {
 		return err
@@ -241,23 +243,23 @@ func (cfg *config) compileIgnorePatterns() error {
 }
 
 // prepareCertificates loads the client side certificates used by the HTTP client.
-func (cfg *config) prepareCertificates() error {
+func (cfg *Config) prepareCertificates() error {
 	cert, err := certs.LoadCertificate(
 		cfg.ClientCert, cfg.ClientKey, cfg.ClientPassphrase)
 	if err != nil {
 		return err
 	}
-	cfg.clientCerts = cert
+	cfg.ClientCerts = cert
 	return nil
 }
 
 // prepare prepares internal state of a loaded configuration.
-func (cfg *config) prepare() error {
-	for _, prepare := range []func(*config) error{
-		(*config).prepareDirectory,
-		(*config).prepareLogging,
-		(*config).prepareCertificates,
-		(*config).compileIgnorePatterns,
+func (cfg *Config) Prepare() error {
+	for _, prepare := range []func(*Config) error{
+		(*Config).prepareDirectory,
+		(*Config).PrepareLogging,
+		(*Config).prepareCertificates,
+		(*Config).compileIgnorePatterns,
 	} {
 		if err := prepare(cfg); err != nil {
 			return err

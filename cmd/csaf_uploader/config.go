@@ -19,7 +19,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/csaf-poc/csaf_distribution/v3/internal/certs"
-	"github.com/csaf-poc/csaf_distribution/v3/internal/options"
+	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
 )
 
 const (
