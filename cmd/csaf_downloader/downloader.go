@@ -130,11 +130,9 @@ func (d *Downloader) httpClient() util.Client {
 	client := util.Client(&hClient)
 
 	// Add extra headers.
-	if len(d.cfg.ExtraHeader) > 0 {
-		client = &util.HeaderClient{
-			Client: client,
-			Header: d.cfg.ExtraHeader,
-		}
+	client = &util.HeaderClient{
+		Client: client,
+		Header: d.cfg.ExtraHeader,
 	}
 
 	// Add optional URL logging.
