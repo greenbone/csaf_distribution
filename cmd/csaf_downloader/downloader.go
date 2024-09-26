@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -678,7 +679,8 @@ nextAdvisory:
 		}
 
 		if d.cfg.ForwardChannel {
-			d.Csafs <- data.Bytes()
+			// the bytes slice is modified by the next buffer modification, so we need to copy it
+			d.Csafs <- slices.Clone(data.Bytes())
 		}
 
 		if d.cfg.NoStore {
