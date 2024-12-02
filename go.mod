@@ -6,7 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/Intevation/gval v1.3.0
 	github.com/Intevation/jsonpath v0.2.1
-	github.com/ProtonMail/gopenpgp/v2 v2.8.0
+	github.com/ProtonMail/gopenpgp/v2 v2.8.1
 	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/gofrs/flock v0.12.1
 	github.com/jessevdk/go-flags v1.6.1
@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/ProtonMail/go-crypto v1.1.2 // indirect
+	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/cloudflare/circl v1.5.0 // indirect
