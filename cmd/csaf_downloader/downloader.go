@@ -39,12 +39,6 @@ import (
 	"github.com/gocsaf/csaf/v3/util"
 )
 
-type Downloader struct {
-	cfg       *Config
-	"github.com/gocsaf/csaf/v3/csaf"
-	"github.com/gocsaf/csaf/v3/util"
-)
-
 type hashFetchInfo struct {
 	url       string
 	preferred bool
@@ -52,8 +46,8 @@ type hashFetchInfo struct {
 	hashType  hashAlgorithm
 }
 
-type downloader struct {
-	cfg       *config
+type Downloader struct {
+	cfg       *Config
 	client    *util.Client // Used for testing
 	keys      *crypto.KeyRing
 	validator csaf.RemoteValidator

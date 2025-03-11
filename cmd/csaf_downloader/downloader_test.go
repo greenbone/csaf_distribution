@@ -6,7 +6,7 @@
 // SPDX-FileCopyrightText: 2023 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
 // Software-Engineering: 2023 Intevation GmbH <https://intevation.de>
 
-package main
+package csaf_downloader
 
 import (
 	"context"
@@ -128,23 +128,23 @@ func TestShaMarking(t *testing.T) {
 			client := util.Client(hClient)
 
 			tempDir := t.TempDir()
-			cfg := config{LogLevel: &options.LogLevel{Level: slog.LevelDebug}, Directory: tempDir, PreferredHash: test.preferredHash}
-			err := cfg.prepare()
+			cfg := Config{LogLevel: &options.LogLevel{Level: slog.LevelDebug}, Directory: tempDir, PreferredHash: test.preferredHash}
+			err := cfg.Prepare()
 			if err != nil {
 				t.Fatalf("SHA marking config failed: %v", err)
 			}
-			d, err := newDownloader(&cfg)
+			d, err := NewDownloader(&cfg)
 			if err != nil {
 				t.Fatalf("could not init downloader: %v", err)
 			}
 			d.client = &client
 
 			ctx := context.Background()
-			err = d.run(ctx, []string{serverURL + "/provider-metadata.json"})
+			err = d.Run(ctx, []string{serverURL + "/provider-metadata.json"})
 			if err != nil {
 				t.Errorf("SHA marking %v: Expected no error, got: %v", test.name, err)
 			}
-			d.close()
+			d.Close()
 
 			// Check for downloaded hashes
 			sha256Exists := checkIfFileExists(tempDir+"/white/2020/avendor-advisory-0004.json.sha256", t)
