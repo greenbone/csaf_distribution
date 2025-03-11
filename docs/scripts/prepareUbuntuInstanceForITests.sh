@@ -2,11 +2,11 @@
 set -e
 
 # This script prepares a naked Ubuntu LTS amd64
-# for the csaf_distribution integration tests
+# for the csaf integration tests
 # by installing the required packages.
 
 apt update
-apt install -y make bash curl gnupg sed tar git nginx fcgiwrap gnutls-bin
+apt install -y make bash curl gnupg sed tar git nginx fcgiwrap gnutls-bin zip
 
 # Install Go from binary distribution
 latest_go="$(curl https://go.dev/VERSION\?m=text| head -1).linux-amd64.tar.gz"

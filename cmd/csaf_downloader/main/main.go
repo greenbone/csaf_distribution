@@ -15,8 +15,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/csaf-poc/csaf_distribution/v3/cmd/csaf_downloader"
-	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
+	"github.com/gocsaf/csaf/v3/cmd/csaf_downloader"
+	"github.com/gocsaf/csaf/v3/internal/options"
 )
 
 func run(cfg *csaf_downloader.Config, domains []string) error {
