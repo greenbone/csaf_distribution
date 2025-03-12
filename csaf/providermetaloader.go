@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/csaf-poc/csaf_distribution/v3/util"
+	"github.com/gocsaf/csaf/v3/util"
 )
 
 // ProviderMetadataLoader helps load provider-metadata.json from
@@ -352,7 +352,7 @@ func (pmdl *ProviderMetadataLoader) loadFromURL(path string) *LoadedProviderMeta
 	case len(errors) > 0:
 		result.Messages = []ProviderMetadataLoadMessage{{
 			Type:    SchemaValidationFailed,
-			Message: fmt.Sprintf("%s: Validating against JSON schema failed: %v", path, err),
+			Message: fmt.Sprintf("%s: Validating against JSON schema failed", path),
 		}}
 		for _, msg := range errors {
 			result.Messages.Add(

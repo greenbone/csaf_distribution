@@ -19,10 +19,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/csaf-poc/csaf_distribution/v3/internal/certs"
-	"github.com/csaf-poc/csaf_distribution/v3/internal/filter"
-	"github.com/csaf-poc/csaf_distribution/v3/pkg/models"
-	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
+	"github.com/gocsaf/csaf/v3/internal/certs"
+	"github.com/gocsaf/csaf/v3/internal/filter"
+	"github.com/gocsaf/csaf/v3/pkg/models"
+	"github.com/gocsaf/csaf/v3/pkg/options"
 )
 
 const (
@@ -39,6 +39,13 @@ type ValidationMode string
 const (
 	ValidationStrict = ValidationMode("strict")
 	ValidationUnsafe = ValidationMode("unsafe")
+)
+
+type hashAlgorithm string
+
+const (
+	algSha256 = hashAlgorithm("sha256")
+	algSha512 = hashAlgorithm("sha512")
 )
 
 type Config struct {
@@ -79,6 +86,8 @@ type Config struct {
 
 	ClientCerts   []tls.Certificate
 	ignorePattern filter.PatternMatcher
+	//lint:ignore SA5008 We are using choice or than once: sha256, sha512
+	PreferredHash hashAlgorithm `long:"preferred_hash" choice:"sha256" choice:"sha512" value-name:"HASH" description:"HASH to prefer" toml:"preferred_hash"`
 
 	ForwardChannel bool // forward the csafs via a channel (is not meant to be set via command line)
 }
@@ -222,7 +231,7 @@ func (cfg *Config) PrepareLogging() error {
 		w = f
 	}
 	ho := slog.HandlerOptions{
-		//AddSource: true,
+		// AddSource: true,
 		Level:       cfg.LogLevel.Level,
 		ReplaceAttr: dropSubSeconds,
 	}

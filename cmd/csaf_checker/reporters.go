@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/csaf-poc/csaf_distribution/v3/util"
+	"github.com/gocsaf/csaf/v3/util"
 )
 
 type (
@@ -178,7 +178,7 @@ func (r *tlpAmberRedReporter) report(p *processor, domain *Domain) {
 		return
 	}
 	if len(p.badAmberRedPermissions) == 0 {
-		req.message(InfoType, "All tested advisories labeled TLP:WHITE or TLP:RED were access-protected.")
+		req.message(InfoType, "All tested advisories labeled TLP:AMBER or TLP:RED were access-protected.")
 		return
 	}
 	req.Messages = p.badAmberRedPermissions

@@ -12,7 +12,7 @@ package main
 import (
 	"log"
 
-	"github.com/csaf-poc/csaf_distribution/v3/pkg/options"
+	"github.com/gocsaf/csaf/v3/pkg/options"
 )
 
 // run uses a processor to check all the given domains or direct urls
