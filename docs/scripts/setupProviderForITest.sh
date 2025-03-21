@@ -61,6 +61,9 @@ echo "
 
         # directory listings
         autoindex on;
+
+        # allow others web applications to get the static information
+        add_header Access-Control-Allow-Origin "*";
 " > locationConfig.txt
 sudo sed -i "/^\s*location \/ {/r locationConfig.txt" $NGINX_CONFIG_PATH # Insert config inside location{}
 ./DNSConfigForItest.sh
