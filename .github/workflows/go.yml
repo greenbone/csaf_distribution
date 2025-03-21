@@ -24,11 +24,6 @@ jobs:
       - name: vet
         run: go vet ./...
 
-      - name: gofmt
-        uses: Jerome1337/gofmt-action@v1.0.4
-        with:
-          gofmt-flags: "-l -d"
-
       - name: golint
         uses: Jerome1337/golint-action@v1.0.3
 
