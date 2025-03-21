@@ -53,6 +53,8 @@ type processor struct {
 	pmd            any
 	keys           *crypto.KeyRing
 	labelChecker   labelChecker
+	timesChanges   map[string]time.Time
+	timesAdv       map[string]time.Time
 
 	invalidAdvisories      topicMessages
 	badFilenames           topicMessages
@@ -188,6 +190,9 @@ func newProcessor(cfg *config) (*processor, error) {
 			advisories:      map[csaf.TLPLabel]util.Set[string]{},
 			whiteAdvisories: map[identifier]bool{},
 		},
+		timesAdv:     map[string]time.Time{},
+		timesChanges: map[string]time.Time{},
+		noneTLS:      util.Set[string]{},
 	}, nil
 }
 
@@ -202,14 +207,14 @@ func (p *processor) close() {
 // reset clears the fields values of the given processor.
 func (p *processor) reset() {
 	p.redirects = nil
-	p.noneTLS = nil
-	for k := range p.alreadyChecked {
-		delete(p.alreadyChecked, k)
-	}
 	p.pmdURL = ""
 	p.pmd256 = nil
 	p.pmd = nil
 	p.keys = nil
+	clear(p.alreadyChecked)
+	clear(p.noneTLS)
+	clear(p.timesAdv)
+	clear(p.timesChanges)
 
 	p.invalidAdvisories.reset()
 	p.badFilenames.reset()
@@ -371,9 +376,6 @@ func (p *processor) checkDomain(domain string) error {
 // checkTLS parses the given URL to check its schema, as a result it sets
 // the value of "noneTLS" field if it is not HTTPS.
 func (p *processor) checkTLS(u string) {
-	if p.noneTLS == nil {
-		p.noneTLS = util.Set[string]{}
-	}
 	if x, err := url.Parse(u); err == nil && x.Scheme != "https" {
 		p.noneTLS.Add(u)
 	}
@@ -617,6 +619,8 @@ func makeAbsolute(base *url.URL) func(*url.URL) *url.URL {
 
 var yearFromURL = regexp.MustCompile(`.*/(\d{4})/[^/]+$`)
 
+// integrity checks several csaf.AdvisoryFiles for formal
+// mistakes, from conforming filenames to invalid advisories.
 func (p *processor) integrity(
 	files []csaf.AdvisoryFile,
 	base string,
@@ -678,9 +682,9 @@ func (p *processor) integrity(
 			continue
 		}
 
-		// Warn if we do not get JSON.
+		// Error if we do not get JSON.
 		if ct := res.Header.Get("Content-Type"); ct != "application/json" {
-			lg(WarnType,
+			lg(ErrorType,
 				"The content type of %s should be 'application/json' but is '%s'",
 				u, ct)
 		}
@@ -732,19 +736,19 @@ func (p *processor) integrity(
 		// Check if file is in the right folder.
 		p.badFolders.use()
 
-		if date, err := p.expr.Eval(
-			`$.document.tracking.initial_release_date`, doc); err != nil {
-			p.badFolders.error(
-				"Extracting 'initial_release_date' from %s failed: %v", u, err)
-		} else if text, ok := date.(string); !ok {
-			p.badFolders.error("'initial_release_date' is not a string in %s", u)
-		} else if d, err := time.Parse(time.RFC3339, text); err != nil {
-			p.badFolders.error(
-				"Parsing 'initial_release_date' as RFC3339 failed in %s: %v", u, err)
-		} else if folderYear == nil {
+		switch date, fault := p.extractTime(doc, `initial_release_date`, u); {
+		case fault != "":
+			p.badFolders.error(fault)
+		case folderYear == nil:
 			p.badFolders.error("No year folder found in %s", u)
-		} else if d.UTC().Year() != *folderYear {
-			p.badFolders.error("%s should be in folder %d", u, d.UTC().Year())
+		case date.UTC().Year() != *folderYear:
+			p.badFolders.error("%s should be in folder %d", u, date.UTC().Year())
+		}
+		current, fault := p.extractTime(doc, `current_release_date`, u)
+		if fault != "" {
+			p.badChanges.error(fault)
+		} else {
+			p.timesAdv[f.URL()] = current
 		}
 
 		// Check hashes
@@ -861,7 +865,46 @@ func (p *processor) integrity(
 		}
 	}
 
+	// If we tested an existing changes.csv
+	if len(p.timesAdv) > 0 && p.badChanges.used() {
+		// Iterate over all files again
+		for _, f := range files {
+			// If there was no previous error when extracting times from advisories and we have a valid time
+			if timeAdv, ok := p.timesAdv[f.URL()]; ok {
+				// If there was no previous error when extracting times from changes and the file was listed in changes.csv
+				if timeCha, ok := p.timesChanges[f.URL()]; ok {
+					// check if the time matches
+					if !timeAdv.Equal(timeCha) {
+						// if not, give an error and remove the pair so it isn't reported multiple times should integrity be called again
+						p.badChanges.error("Current release date in changes.csv and %s is not identical.", f.URL())
+						delete(p.timesAdv, f.URL())
+						delete(p.timesChanges, f.URL())
+					}
+				}
+			}
+		}
+	}
+
 	return nil
+}
+
+// extractTime extracts a time.Time value from a json document and returns it and an empty string or zero time alongside
+// a string representing the error message that prevented obtaining the proper time value.
+func (p *processor) extractTime(doc any, value string, u any) (time.Time, string) {
+	filter := "$.document.tracking." + value
+	date, err := p.expr.Eval(filter, doc)
+	if err != nil {
+		return time.Time{}, fmt.Sprintf("Extracting '%s' from %s failed: %v", value, u, err)
+	}
+	text, ok := date.(string)
+	if !ok {
+		return time.Time{}, fmt.Sprintf("'%s' is not a string in %s", value, u)
+	}
+	d, err := time.Parse(time.RFC3339, text)
+	if err != nil {
+		return time.Time{}, fmt.Sprintf("Parsing '%s' as RFC3339 failed in %s: %v", value, u, err)
+	}
+	return d, ""
 }
 
 // checkIndex fetches the "index.txt" and calls "checkTLS" method for HTTPS checks.
@@ -991,8 +1034,10 @@ func (p *processor) checkChanges(base string, mask whereType) error {
 			}
 			path := r[pathColumn]
 
-			times, files = append(times, t),
+			times, files =
+				append(times, t),
 				append(files, csaf.DirectoryAdvisoryFile{Path: path})
+			p.timesChanges[path] = t
 		}
 		return times, files, nil
 	}()
