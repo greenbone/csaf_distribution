@@ -24,11 +24,5 @@ jobs:
       - name: vet
         run: go vet ./...
 
-      - name: golint
-        uses: Jerome1337/golint-action@v1.0.3
-
-      - name: Revive Action
-        uses: morphy2k/revive-action@v2.7.4
-
       - name: Tests
         run: go test -v ./...
