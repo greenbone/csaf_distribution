@@ -3,7 +3,7 @@ module github.com/gocsaf/csaf/v3
 go 1.23.1
 
 require (
-	github.com/BurntSushi/toml v1.4.0
+	github.com/BurntSushi/toml v1.5.0
 	github.com/Intevation/gval v1.3.0
 	github.com/Intevation/jsonpath v0.2.1
 	github.com/ProtonMail/gopenpgp/v2 v2.8.3
