@@ -28,6 +28,8 @@ echo "
 
         location = / {
                 try_files /.well-known/csaf/provider-metadata.json =404;
+                # allow others web applications to get the static information
+                add_header Access-Control-Allow-Origin "*";
         }
 
         access_log /var/log/nginx/dns-domain_access.log;
