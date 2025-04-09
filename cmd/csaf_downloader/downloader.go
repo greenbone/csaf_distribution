@@ -530,7 +530,7 @@ func (dc *downloadContext) downloadAdvisory(
 			preferred: strings.EqualFold(string(dc.d.cfg.PreferredHash), string(algSha512)),
 		})
 	} else {
-		slog.Info("SHA512 not present")
+		slog.Debug("SHA512 not present")
 	}
 	if file.SHA256URL() != "" {
 		hashToFetch = append(hashToFetch, hashFetchInfo{
@@ -540,7 +540,7 @@ func (dc *downloadContext) downloadAdvisory(
 			preferred: strings.EqualFold(string(dc.d.cfg.PreferredHash), string(algSha256)),
 		})
 	} else {
-		slog.Info("SHA256 not present")
+		slog.Debug("SHA256 not present")
 	}
 	if file.IsDirectory() {
 		for i := range hashToFetch {
