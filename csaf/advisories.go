@@ -407,9 +407,13 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			switch {
 			case sha256 == "" && sha512 == "":
 				slog.Error("No hash listed on ROLIE feed", "file", self)
+				err := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no hash listed on TLP:%s ROLIE feed (%s) for CSAF %s", label, feedURL.String(), self)}
+				feedErrs = append(feedErrs, err)
 				return
 			case sign == "":
 				slog.Error("No signature listed on ROLIE feed", "file", self)
+				err := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no signature listed on TLP:%s ROLIE feed (%s) for CSAF %s", label, feedURL.String(), self)}
+				feedErrs = append(feedErrs, err)
 				return
 			default:
 				file = PlainAdvisoryFile{self, sha256, sha512, sign}
