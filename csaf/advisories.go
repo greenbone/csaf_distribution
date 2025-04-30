@@ -187,6 +187,7 @@ func (afp *AdvisoryFileProcessor) Process(
 			dirURLs = []string{baseURL}
 		}
 
+		feedErrs := []error{} // errors encountered while processing directories/feeds
 		for _, base := range dirURLs {
 			if base == "" {
 				continue
@@ -195,12 +196,17 @@ func (afp *AdvisoryFileProcessor) Process(
 			// Use changes.csv to be able to filter by age.
 			files, err := afp.loadChanges(base, lg)
 			if err != nil {
-				return err
+				feedErrs = append(feedErrs, err)
+				continue
 			}
 			// XXX: Is treating as white okay? better look into the advisories?
 			if err := fn(TLPLabelWhite, files); err != nil {
-				return err
+				feedErrs = append(feedErrs, err)
 			}
+		}
+
+		if len(feedErrs) > 0 {
+			return &errs.CompositeErrFeed{Errs: feedErrs}
 		}
 	} // TODO: else scan directories?
 	return nil
@@ -214,23 +220,36 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 ) ([]AdvisoryFile, error) {
 	base, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, err
+		return nil, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid directory url %s: %v", baseURL, err)}
 	}
 	changesURL := base.JoinPath("changes.csv").String()
 
 	resp, err := afp.client.Get(changesURL)
 	if err != nil {
-		return nil, err
+		return nil, errs.ErrNetwork{Message: fmt.Sprintf("failed get request for url %s: %v", changesURL, err)}
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching %s failed. Status code %d (%s)",
-			changesURL, resp.StatusCode, resp.Status)
+		switch { // we don't expect 401 and 403, as diretory based feeds are supposed to be public, but just to be on the safe side
+		case resp.StatusCode == http.StatusUnauthorized:
+			return nil, errs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials for accessing %s: %s", changesURL, resp.Status)}
+		case resp.StatusCode == http.StatusForbidden:
+			return []AdvisoryFile{}, nil // user has insufficient permissions to access feed, no error
+		case resp.StatusCode == http.StatusNotFound:
+			return nil, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not find changes.csv at %s: %s", changesURL, resp.Status)}
+		case resp.StatusCode > 500:
+			return nil, fmt.Errorf("could not retrieve changes.csv at %s: %s %w", changesURL, resp.Status, errs.ErrRetryable) // mark error as retryable
+		default:
+			return nil, fmt.Errorf("could not retrieve changes.csv at %s: %s", changesURL, resp.Status)
+		}
 	}
 
 	defer resp.Body.Close()
 	var files []AdvisoryFile
 	c := csv.NewReader(resp.Body)
+	// format specification:
+	// https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html#7113-requirement-13-changescsv
+	c.FieldsPerRecord = 2
 	const (
 		pathColumn = 0
 		timeColumn = 1
@@ -241,16 +260,12 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 			break
 		}
 		if err != nil {
-			return nil, err
-		}
-		if len(r) < 2 {
-			lg(slog.LevelError, "Not enough columns", "line", line)
-			continue
+			return nil, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not read record from changes.csv: %v", err)}
 		}
 		t, err := time.Parse(time.RFC3339, r[timeColumn])
 		if err != nil {
 			lg(slog.LevelError, "Invalid time stamp in line", "url", changesURL, "line", line, "err", err)
-			continue
+			return nil, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not read timestamp from changes.csv: %v", err)}
 		}
 		// Apply date range filtering.
 		if afp.AgeAccept != nil && !afp.AgeAccept(t) {
@@ -259,7 +274,7 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 		path := r[pathColumn]
 		if _, err := url.Parse(path); err != nil {
 			lg(slog.LevelError, "Contains an invalid URL", "url", changesURL, "path", path, "line", line)
-			continue
+			return nil, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not read url from changes.csv: %v", err)}
 		}
 
 		files = append(files,
@@ -427,7 +442,7 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 		}
 	}
 	if len(feedErrs) > 0 {
-		return &errs.CompositeErrRolieFeed{Errs: feedErrs}
+		return &errs.CompositeErrFeed{Errs: feedErrs}
 	}
 	return nil
 }
