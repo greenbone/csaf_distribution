@@ -335,14 +335,15 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			switch {
 			case res.StatusCode == http.StatusUnauthorized:
 				feedErrs = append(feedErrs, errs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials for TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
-			case res.StatusCode == http.StatusNotFound:
-				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not find TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
 			case res.StatusCode == http.StatusForbidden:
 				// user has insufficient permissions to access feed, no error
-			case res.StatusCode > 500:
-				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve TLP:%s ROLIE feed at %s: %s %w", label, feedURL.String(), res.Status, errs.ErrRetryable)) // mark error as retryable
+			case res.StatusCode == http.StatusNotFound:
+				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not find TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
+			case res.StatusCode >= 500:
+				providerErr := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)}
+				feedErrs = append(feedErrs, fmt.Errorf("%w %w", providerErr, errs.ErrRetryable)) // mark error as retryable as failure for server side errors are often temporary
 			default:
-				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status))
+				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
 			}
 			continue
 		}
