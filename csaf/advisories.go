@@ -237,9 +237,10 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 			return []AdvisoryFile{}, nil // user has insufficient permissions to access feed, no error
 		case resp.StatusCode == http.StatusNotFound:
 			return nil, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not find changes.csv at %s: %s", changesURL, resp.Status)}
-		case resp.StatusCode > 500:
-			return nil, fmt.Errorf("could not retrieve changes.csv at %s: %s %w", changesURL, resp.Status, errs.ErrRetryable) // mark error as retryable
-		default:
+		case resp.StatusCode >= 500:
+			providerErr := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not retrieve changes.csv at %s: %s", changesURL, resp.Status)}
+			return nil, fmt.Errorf("%w %w", providerErr, errs.ErrRetryable) // mark error as retryable as failure for server side errors are often temporary
+		default: // client error or fringe case
 			return nil, fmt.Errorf("could not retrieve changes.csv at %s: %s", changesURL, resp.Status)
 		}
 	}
