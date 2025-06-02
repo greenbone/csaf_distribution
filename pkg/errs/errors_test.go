@@ -26,21 +26,21 @@ func TestFlattenError(t *testing.T) {
 
 		compositeErrCsafDownload := &CompositeErrCsafDownload{Errs: csafDownloadErrsFlat}
 
-		singleRolieFeedErrs := []error{
-			errors.New("single error rolie feed 1"),
-			errors.New("single error rolie feed 2"),
+		singleFeedErrs := []error{
+			errors.New("single error feed 1"),
+			errors.New("single error feed 2"),
 		}
 
-		rolieFeedCompositeErr := CompositeErrRolieFeed{
+		feedCompositeErr := CompositeErrFeed{
 			Errs: append(
-				singleRolieFeedErrs,
-				fmt.Errorf("issues during downloader of rolie: %w", compositeErrCsafDownload),
+				singleFeedErrs,
+				fmt.Errorf("issues during download of feed: %w", compositeErrCsafDownload),
 				compositeErrCsafDownload,
 			),
 		}
-		wantFlattenedErrors := slices.Concat(singleRolieFeedErrs, csafDownloadErrsFlat, csafDownloadErrsFlat)
+		wantFlattenedErrors := slices.Concat(singleFeedErrs, csafDownloadErrsFlat, csafDownloadErrsFlat)
 
-		gotFlattenedErrors := FlattenError(fmt.Errorf("wrap rolie feed composite err: %w", &rolieFeedCompositeErr))
+		gotFlattenedErrors := FlattenError(fmt.Errorf("wrap feed composite err: %w", &feedCompositeErr))
 
 		assert.ElementsMatch(t, wantFlattenedErrors, gotFlattenedErrors)
 	})
