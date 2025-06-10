@@ -70,6 +70,8 @@ func writeStrings(header string, messages []string) {
 // create sends an request to create the initial files and directories
 // on the server. It prints the response messages.
 func (p *processor) create() error {
+	log.Printf("Creating safe uploader... %v\n", p.cfg.URL)
+	log.Printf("Creating with cached auth... %v\n", p.cfg.cachedAuth)
 	req, err := http.NewRequest(http.MethodGet, p.cfg.URL+"/api/create", nil)
 	if err != nil {
 		return err
