@@ -137,10 +137,15 @@ func (c *controller) auth(
 	fn func(http.ResponseWriter, *http.Request),
 ) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, r *http.Request) {
+		log.Println("auth middleware triggered for", r.URL.Path)
+
 		if !c.authenticate(r) {
+			log.Println("authentication failed for", r.RemoteAddr)
 			http.Error(rw, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
+
+		log.Println("authentication successful for", r.RemoteAddr)
 		fn(rw, r)
 	}
 }
