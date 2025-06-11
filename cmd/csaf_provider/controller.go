@@ -9,9 +9,11 @@
 package main
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -137,15 +139,32 @@ func (c *controller) auth(
 	fn func(http.ResponseWriter, *http.Request),
 ) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		log.Println("auth middleware triggered for", r.URL.Path)
+		log.Printf("auth middleware triggered: %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+
+		// Log headers
+		log.Println("Request Headers:")
+		for name, values := range r.Header {
+			for _, value := range values {
+				log.Printf("  %s: %s", name, value)
+			}
+		}
+
+		// Read and log the request body (and replace it for downstream use)
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Failed to read request body: %v", err)
+		} else {
+			log.Printf("Request Body: %s", string(bodyBytes))
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		}
 
 		if !c.authenticate(r) {
-			log.Println("authentication failed for", r.RemoteAddr)
+			log.Printf("authentication failed for %s", r.RemoteAddr)
 			http.Error(rw, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
 
-		log.Println("authentication successful for", r.RemoteAddr)
+		log.Printf("authentication passed for %s", r.RemoteAddr)
 		fn(rw, r)
 	}
 }
