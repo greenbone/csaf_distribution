@@ -81,11 +81,14 @@ func (p *processor) create() error {
 		return err
 	}
 	defer resp.Body.Close()
-	log.Printf("Creating safe uploader... %v\n", p.cfg.URL)
+	log.Printf("Creating custom safe uploader... %v\n", p.cfg.URL)
 	log.Printf("Creating with cached auth... %v\n", p.cfg.cachedAuth)
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Create failed: %s\n", resp.Status)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("Error response body: %s\n", string(bodyBytes))
+		return fmt.Errorf("create failed with status: %s", resp.Status)
 	}
 
 	var result struct {
