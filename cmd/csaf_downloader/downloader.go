@@ -921,20 +921,18 @@ func (d *Downloader) RunEnumerate(domains []string) error {
 // proxyFromEnvironment sets the proxy from the environment variables.
 // The proxy is set as documented in [http.ProxyFromEnvironment],
 // However the http(s) proxy can be also set via env vars `CSAF_DL_HTTP_PROXY`
-// and `CSAF_DL_HTTPS_PROXY`. They will take precedence over `http_proxy`
-// and `https_proxy` and also their upper case versions.
-// Setting these custom env vars to an empty string will explicitly disable
-// the proxy for the CSAF downloader.
+// and `CSAF_DL_HTTPS_PROXY`. If set to a non empty string, they will take precedence
+// over `http_proxy` and `https_proxy` and also their upper case versions.
 // The purpose is to allow setting the proxy specifically for the CSAF downloader.
 func proxyFromEnvironment(req *http.Request) (*url.URL, error) {
 	cfg := httpproxy.FromEnvironment()
 
-	csafHTTPProxy, set := os.LookupEnv("CSAF_DL_HTTP_PROXY")
-	if set {
+	csafHTTPProxy := os.Getenv("CSAF_DL_HTTP_PROXY")
+	if csafHTTPProxy != "" {
 		cfg.HTTPProxy = csafHTTPProxy
 	}
-	csafHTTPSProxy, set := os.LookupEnv("CSAF_DL_HTTPS_PROXY")
-	if set {
+	csafHTTPSProxy := os.Getenv("CSAF_DL_HTTPS_PROXY")
+	if csafHTTPSProxy != "" {
 		cfg.HTTPSProxy = csafHTTPSProxy
 	}
 

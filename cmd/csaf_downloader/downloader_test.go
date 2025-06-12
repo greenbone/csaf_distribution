@@ -174,7 +174,7 @@ func TestProxyFromEnvironment(t *testing.T) {
 		wantHTTPProxy    string
 		wantHTTPSProxy   string
 	}{
-		"custom env vars take precedence": {
+		"custom http proxy env vars take precedence": {
 			httpProxy:        "http://example.com:8080",
 			httpsProxy:       "https://example.com:8443",
 			csafDLHTTPProxy:  toPtr("http://custom.com:8080"),
@@ -182,13 +182,13 @@ func TestProxyFromEnvironment(t *testing.T) {
 			wantHTTPProxy:    "custom.com:8080",
 			wantHTTPSProxy:   "custom.com:8443",
 		},
-		"empty custom env vars disables proxy": {
+		"common http proxy env vars are still applied if custom env vars are set to empty string": {
 			httpProxy:        "http://example.com:8080",
 			httpsProxy:       "https://example.com:8443",
 			csafDLHTTPProxy:  toPtr(""),
 			csafDLHTTPSProxy: toPtr(""),
-			wantHTTPProxy:    "",
-			wantHTTPSProxy:   "",
+			wantHTTPProxy:    "example.com:8080",
+			wantHTTPSProxy:   "example.com:8443",
 		},
 		"common http proxy env vars are still applied if custom env vars are unset": {
 			httpProxy:        "http://example.com:8080",
