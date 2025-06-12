@@ -167,3 +167,8 @@ unattented. In this situation the processing environment should be secured
 properly instead.
 
 [^1]: Accepted syntax is described [here](https://github.com/google/re2/wiki/Syntax).
+
+#### Using Proxy
+
+The CSAF Downloader can be configured to use a proxy. You need to define environment variables as described in [httpproxy.ProxyFromEnvironment](https://pkg.go.dev/golang.org/x/net/http/httpproxy#FromEnvironment). Additionally you can set the proxy explicitly only for the CSAF Downloader via the environment variables `CSAF_DL_HTTP_PROXY`
+and `CSAF_DL_HTTPS_PROXY`. They will take precedence over `http_proxy` and `https_proxy` and also their upper case versions. Setting these custom env vars to an empty string will explicitly disable the proxy for the CSAF downloader.
