@@ -215,7 +215,7 @@ func TestProxyFromEnvironment(t *testing.T) {
 				req := httptest.NewRequest("GET", targetURL, nil)
 				proxyURL, err := proxyFromEnvironment(req)
 				if proxyURL == nil {
-					proxyURL = &url.URL{} // it us cumbersome to check for nil later
+					proxyURL = &url.URL{} // it is cumbersome to check for nil later
 				}
 				return *proxyURL, err
 			}
