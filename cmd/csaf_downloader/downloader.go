@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
+	"golang.org/x/net/http/httpproxy"
 	"golang.org/x/time/rate"
 
 	"github.com/gocsaf/csaf/v3/csaf"
@@ -132,7 +133,7 @@ func (d *Downloader) httpClient() util.Client {
 
 	hClient.Transport = &http.Transport{
 		TLSClientConfig: &tlsConfig,
-		Proxy:           http.ProxyFromEnvironment,
+		Proxy:           proxyFromEnvironment,
 	}
 
 	client := util.Client(&hClient)
@@ -915,4 +916,25 @@ func (d *Downloader) RunEnumerate(domains []string) error {
 		}
 	}
 	return nil
+}
+
+// proxyFromEnvironment sets the proxy from the environment variables.
+// The proxy is set as documented in [http.ProxyFromEnvironment],
+// However the http(s) proxy can be also set via env vars `CSAF_DL_HTTP_PROXY`
+// and `CSAF_DL_HTTPS_PROXY`. If set to a non empty string, they will take precedence
+// over `http_proxy` and `https_proxy` and also their upper case versions.
+// The purpose is to allow setting the proxy specifically for the CSAF downloader.
+func proxyFromEnvironment(req *http.Request) (*url.URL, error) {
+	cfg := httpproxy.FromEnvironment()
+
+	csafHTTPProxy := os.Getenv("CSAF_DL_HTTP_PROXY")
+	if csafHTTPProxy != "" {
+		cfg.HTTPProxy = csafHTTPProxy
+	}
+	csafHTTPSProxy := os.Getenv("CSAF_DL_HTTPS_PROXY")
+	if csafHTTPSProxy != "" {
+		cfg.HTTPSProxy = csafHTTPSProxy
+	}
+
+	return cfg.ProxyFunc()(req.URL)
 }

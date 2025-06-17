@@ -13,12 +13,14 @@ import (
 	"errors"
 	"log/slog"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 
 	"github.com/gocsaf/csaf/v3/internal/testutil"
 	"github.com/gocsaf/csaf/v3/pkg/options"
 	"github.com/gocsaf/csaf/v3/util"
+	"github.com/stretchr/testify/assert"
 )
 
 func checkIfFileExists(path string, t *testing.T) bool {
@@ -155,6 +157,77 @@ func TestShaMarking(t *testing.T) {
 			if sha512Exists != test.wantSha512 {
 				t.Errorf("%v: expected sha512 hash present to be %v, got: %v", test.name, test.wantSha512, sha512Exists)
 			}
+		})
+	}
+}
+
+func toPtr[T any](v T) *T {
+	return &v
+}
+
+func TestProxyFromEnvironment(t *testing.T) {
+	tests := map[string]struct {
+		httpProxy        string
+		httpsProxy       string
+		csafDLHTTPProxy  *string
+		csafDLHTTPSProxy *string
+		wantHTTPProxy    string
+		wantHTTPSProxy   string
+	}{
+		"custom http proxy env vars take precedence": {
+			httpProxy:        "http://example.com:8080",
+			httpsProxy:       "https://example.com:8443",
+			csafDLHTTPProxy:  toPtr("http://custom.com:8080"),
+			csafDLHTTPSProxy: toPtr("https://custom.com:8443"),
+			wantHTTPProxy:    "custom.com:8080",
+			wantHTTPSProxy:   "custom.com:8443",
+		},
+		"common http proxy env vars are still applied if custom env vars are set to empty string": {
+			httpProxy:        "http://example.com:8080",
+			httpsProxy:       "https://example.com:8443",
+			csafDLHTTPProxy:  toPtr(""),
+			csafDLHTTPSProxy: toPtr(""),
+			wantHTTPProxy:    "example.com:8080",
+			wantHTTPSProxy:   "example.com:8443",
+		},
+		"common http proxy env vars are still applied if custom env vars are unset": {
+			httpProxy:        "http://example.com:8080",
+			httpsProxy:       "https://example.com:8443",
+			csafDLHTTPProxy:  nil,
+			csafDLHTTPSProxy: nil,
+			wantHTTPProxy:    "example.com:8080",
+			wantHTTPSProxy:   "example.com:8443",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("http_proxy", tt.httpProxy)
+			t.Setenv("https_proxy", tt.httpsProxy)
+			if tt.csafDLHTTPProxy != nil {
+				t.Setenv("CSAF_DL_HTTP_PROXY", *tt.csafDLHTTPProxy)
+			}
+			if tt.csafDLHTTPSProxy != nil {
+				t.Setenv("CSAF_DL_HTTPS_PROXY", *tt.csafDLHTTPSProxy)
+			}
+
+			getProxyURL := func(targetURL string) (url.URL, error) {
+				req := httptest.NewRequest("GET", targetURL, nil)
+				proxyURL, err := proxyFromEnvironment(req)
+				if proxyURL == nil {
+					proxyURL = &url.URL{} // it is cumbersome to check for nil later
+				}
+				return *proxyURL, err
+			}
+
+			proxyURL, err := getProxyURL("http://target.com")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantHTTPProxy, proxyURL.Host, "http proxy mismatch")
+
+			// same checks for https
+			proxyURL, err = getProxyURL("https://target.com")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantHTTPSProxy, proxyURL.Host, "https proxy mismatch")
 		})
 	}
 }
