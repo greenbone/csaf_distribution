@@ -5,16 +5,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.23.6'
+          go-version: "^1.23.6"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 24
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,8 +37,8 @@ jobs:
       - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
-            name: checker-results
-            path: |
-                ~/checker-results.html
-                ~/checker-results-no-clientcert.json
-            if-no-files-found: error
+          name: checker-results
+          path: |
+            ~/checker-results.html
+            ~/checker-results-no-clientcert.json
+          if-no-files-found: error
