@@ -10,13 +10,17 @@ package csaf
 
 import (
 	"bytes"
+	"crypto/tls"
 	_ "embed" // Used for embedding.
-	"io"
+	"errors"
+	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 //go:embed schema/csaf_json_schema.json
@@ -64,13 +68,28 @@ var (
 	compiledRolieSchema      = compiledSchema{url: rolieSchemaURL}
 )
 
-// loadURL loads the content of an URL from embedded data or
-// falls back to the global loader function of the jsonschema package.
-func loadURL(s string) (io.ReadCloser, error) {
-	loader := func(data []byte) (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(data)), nil
+type schemaLoader http.Client
+
+func (l *schemaLoader) loadHTTPURL(url string) (any, error) {
+	client := (*http.Client)(l)
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
 	}
-	switch s {
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s returned status code %d", url, resp.StatusCode)
+	}
+
+	return jsonschema.UnmarshalJSON(resp.Body)
+}
+
+// Load loads the schema from the specified url.
+func (l *schemaLoader) Load(url string) (any, error) {
+	loader := func(data []byte) (any, error) {
+		return jsonschema.UnmarshalJSON(bytes.NewReader(data))
+	}
+	switch url {
 	case csafSchemaURL:
 		return loader(csafSchema)
 	case cvss20SchemaURL:
@@ -86,14 +105,27 @@ func loadURL(s string) (io.ReadCloser, error) {
 	case rolieSchemaURL:
 		return loader(rolieSchema)
 	default:
-		return jsonschema.LoadURL(s)
+		// Fallback to http loader
+		return l.loadHTTPURL(url)
 	}
+}
+
+func newSchemaLoader(insecure bool) *schemaLoader {
+	httpLoader := schemaLoader(http.Client{
+		Timeout: 15 * time.Second,
+	})
+	if insecure {
+		httpLoader.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
+	return &httpLoader
 }
 
 func (cs *compiledSchema) compile() {
 	c := jsonschema.NewCompiler()
-	c.AssertFormat = true
-	c.LoadURL = loadURL
+	c.AssertFormat()
+	c.UseLoader(newSchemaLoader(false))
 	cs.compiled, cs.err = c.Compile(cs.url)
 }
 
@@ -109,7 +141,8 @@ func (cs *compiledSchema) validate(doc any) ([]string, error) {
 		return nil, nil
 	}
 
-	valErr, ok := err.(*jsonschema.ValidationError)
+	var valErr *jsonschema.ValidationError
+	ok := errors.As(err, &valErr)
 	if !ok {
 		return nil, err
 	}
@@ -133,21 +166,21 @@ func (cs *compiledSchema) validate(doc any) ([]string, error) {
 		if pi != pj {
 			return pi < pj
 		}
-		return errs[i].Error < errs[j].Error
+		return errs[i].Error.String() < errs[j].Error.String()
 	})
 
 	res := make([]string, 0, len(errs))
 
 	for i := range errs {
 		e := &errs[i]
-		if e.Error == "" {
+		if e.Error == nil {
 			continue
 		}
 		loc := e.InstanceLocation
 		if loc == "" {
 			loc = e.AbsoluteKeywordLocation
 		}
-		res = append(res, loc+": "+e.Error)
+		res = append(res, loc+": "+e.Error.String())
 	}
 
 	return res, nil
