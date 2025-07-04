@@ -492,7 +492,7 @@ func (dc *downloadContext) downloadAdvisory(
 		case resp.StatusCode == http.StatusUnauthorized:
 			errorCh <- csafErrs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials to retrieve CSAF document %s at URL %s: %s", filename, file.URL(), resp.Status)}
 		case resp.StatusCode == http.StatusForbidden:
-			// if we have access to the feed containing the document, we also must have access to itself, otherwise this inidates a problem with the provider
+			// if we have access to the feed containing the document, we also must have access to itself, otherwise this indicates a problem with the provider
 			errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprintf("access denied to CSAF document %s at URL %s: %s", filename, file.URL(), resp.Status)}
 		case resp.StatusCode == http.StatusNotFound:
 			errorCh <- csafErrs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not find CSAF document %s listed in table of content at URL %s: %s ", filename, file.URL(), resp.Status)}
