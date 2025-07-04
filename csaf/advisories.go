@@ -343,8 +343,8 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			case res.StatusCode >= 500:
 				providerErr := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)}
 				feedErrs = append(feedErrs, fmt.Errorf("%w %w", providerErr, errs.ErrRetryable)) // mark error as retryable as failure for server side errors are often temporary
-			default:
-				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
+			default: // client error or fringe case
+				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status))
 			}
 			continue
 		}
