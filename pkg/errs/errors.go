@@ -47,14 +47,14 @@ func (e ErrInvalidCredentials) Error() string {
 
 var ErrRetryable = errors.New("(retryable error)")
 
-// CompositeErrRolieFeed holds an array of errors which encountered during processing rolie feeds
-type CompositeErrRolieFeed struct {
+// CompositeErrFeed holds an array of errors which encountered during processing rolie feeds
+type CompositeErrFeed struct {
 	Errs []error
 }
 
-func (e *CompositeErrRolieFeed) Error() string {
+func (e *CompositeErrFeed) Error() string {
 	if len(e.Errs) == 0 {
-		return "empty CompositeErrRolieFeed"
+		return "empty CompositeErrFeed"
 	}
 
 	messages := make([]string, 0, len(e.Errs))
@@ -64,7 +64,7 @@ func (e *CompositeErrRolieFeed) Error() string {
 	return strings.Join(messages, "\n")
 }
 
-func (e *CompositeErrRolieFeed) Unwrap() []error {
+func (e *CompositeErrFeed) Unwrap() []error {
 	return e.Errs
 }
 
@@ -89,10 +89,10 @@ func (e *CompositeErrCsafDownload) Unwrap() []error {
 	return e.Errs
 }
 
-// FlattenError flattens out all composite errors (note: discards the errors wrapped around [CompositeErrRolieFeed] or [CompositeErrCsafDownload])
-// The assumed structure is CompositeErrRolieFeed{Errs: []error{...,CompositeErrCsafDownload,...,CompositeErrCsafDownload,...}}.
+// FlattenError flattens out all composite errors (note: discards the errors wrapped around [CompositeErrFeed] or [CompositeErrCsafDownload])
+// The assumed structure is CompositeErrFeed{Errs: []error{...,CompositeErrCsafDownload,...,CompositeErrCsafDownload,...}}.
 func FlattenError(err error) (flattenedErrors []error) {
-	var rolieErrs *CompositeErrRolieFeed
+	var rolieErrs *CompositeErrFeed
 	if errors.As(err, &rolieErrs) {
 		for _, rolieErr := range rolieErrs.Unwrap() {
 			var csafDlErrs *CompositeErrCsafDownload
