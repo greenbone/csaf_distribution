@@ -230,7 +230,7 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		switch { // we don't expect 401 and 403, as diretory based feeds are supposed to be public, but just to be on the safe side
+		switch { // we don't expect 401 and 403, as directory based feeds are supposed to be public, but just to be on the safe side
 		case resp.StatusCode == http.StatusUnauthorized:
 			return nil, errs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials for accessing %s: %s", changesURL, resp.Status)}
 		case resp.StatusCode == http.StatusForbidden:
