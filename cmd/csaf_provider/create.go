@@ -245,7 +245,7 @@ func createOpenPGPFolder(c *config, wellknown string) error {
 	return err
 }
 
-// setupSecurity creates the "security.txt" file if does not exist
+// setupSecurity creates the "security.txt" file if it does not exist
 // and writes the CSAF field inside the file. If the file exists
 // it checks ig the CSAF entry with the provider-metadata.json
 // path is already in. If its not it is added in front of all lines.

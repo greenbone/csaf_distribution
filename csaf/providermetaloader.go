@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -242,6 +243,10 @@ func (pmdl *ProviderMetadataLoader) loadFromSecurity(domain string) []*LoadedPro
 		"https://" + domain + "/security.txt",
 	} {
 		res, err := pmdl.client.Get(path)
+		log.Println("Loading provider-metadata.json ===========> with response code", path, res.StatusCode)
+		pmdl.messages.Add(
+			ExtraProviderMetadataFound,
+			fmt.Sprintf("Fetching +++++ %q failed+++++: %s (%d)", path, res.Status, res.StatusCode))
 		if err != nil {
 			pmdl.messages.Add(
 				HTTPFailed,
