@@ -16,7 +16,7 @@ jobs:
           node-version: 24
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Execute the scripts
         run: |
