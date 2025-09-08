@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gocsaf/csaf/v3/internal/misc"
 	"github.com/gocsaf/csaf/v3/pkg/errs"
 	"github.com/gocsaf/csaf/v3/util"
 )
@@ -96,7 +97,7 @@ type AdvisoryFileProcessor struct {
 	client    util.Client
 	expr      *util.PathEval
 	doc       any
-	base      *url.URL
+	pmdURL    *url.URL
 }
 
 // NewAdvisoryFileProcessor constructs a filename extractor
@@ -105,13 +106,13 @@ func NewAdvisoryFileProcessor(
 	client util.Client,
 	expr *util.PathEval,
 	doc any,
-	base *url.URL,
+	pmdURL *url.URL,
 ) *AdvisoryFileProcessor {
 	return &AdvisoryFileProcessor{
 		client: client,
 		expr:   expr,
 		doc:    doc,
-		base:   base,
+		pmdURL: pmdURL,
 	}
 }
 
@@ -180,7 +181,7 @@ func (afp *AdvisoryFileProcessor) Process(
 
 		// Not found -> fall back to PMD url
 		if empty(dirURLs) {
-			baseURL, err := util.BaseURL(afp.base)
+			baseURL, err := util.BaseURL(afp.pmdURL)
 			if err != nil {
 				return err
 			}
@@ -278,8 +279,13 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 			return nil, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("could not read url from changes.csv: %v", err)}
 		}
 
+		pathURL, err := url.Parse(path)
+		if err != nil {
+			return nil, err
+		}
+
 		files = append(files,
-			DirectoryAdvisoryFile{Path: base.JoinPath(path).String()})
+			DirectoryAdvisoryFile{Path: misc.JoinURL(base, pathURL).String()})
 	}
 	return files, nil
 }
@@ -302,25 +308,18 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			label = "unknown"
 		}
 
-		up, err := url.Parse(string(*feed.URL))
+		feedURL, err := url.Parse(string(*feed.URL))
 		if err != nil {
 			slog.Error("Invalid URL in feed", "feed", *feed.URL, "err", err)
 			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid TLP:%s feed URL %s: %v", label, *feed.URL, err)})
 			continue
 		}
-		feedURL := afp.base.ResolveReference(up)
 		slog.Info("Got feed URL", "feed", feedURL)
 
 		fb, err := util.BaseURL(feedURL)
 		if err != nil {
 			slog.Error("Invalid feed base URL", "url", fb, "err", err)
 			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid TLP:%s feed base URL %s: %v", label, fb, err)})
-			continue
-		}
-		feedBaseURL, err := url.Parse(fb)
-		if err != nil {
-			slog.Error("Cannot parse feed base URL", "url", fb, "err", err)
-			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("cannot parse TLP:%s feed base URL %s: %v", label, fb, err)})
 			continue
 		}
 
@@ -369,7 +368,7 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 				slog.Error("Invalid URL", "url", u, "err", err)
 				return "", errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid url in TLP:%s ROLIE feed at %s to file %s: %v", label, feedURL.String(), u, err)}
 			}
-			return feedBaseURL.ResolveReference(p).String(), nil
+			return p.String(), nil
 		}
 
 		rfeed.Entries(func(entry *Entry) {

@@ -13,7 +13,6 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -31,6 +30,7 @@ import (
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
 
 	"github.com/gocsaf/csaf/v3/csaf"
+	"github.com/gocsaf/csaf/v3/internal/misc"
 	"github.com/gocsaf/csaf/v3/util"
 )
 
@@ -67,7 +67,7 @@ func (w *worker) mirrorInternal() (*csaf.AggregatorCSAFProvider, error) {
 	// Collecting the categories per label.
 	w.categories = map[string]util.Set[string]{}
 
-	base, err := url.Parse(w.loc)
+	pmdURL, err := url.Parse(w.loc)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (w *worker) mirrorInternal() (*csaf.AggregatorCSAFProvider, error) {
 		w.client,
 		w.expr,
 		w.metadataProvider,
-		base)
+		pmdURL)
 
 	afp.AgeAccept = w.provider.ageAccept(w.processor.cfg)
 
@@ -538,7 +538,7 @@ func (w *worker) mirrorFiles(tlpLabel csaf.TLPLabel, files []csaf.AdvisoryFile) 
 
 		download := func(r io.Reader) error {
 			tee := io.TeeReader(r, hasher)
-			return json.NewDecoder(tee).Decode(&advisory)
+			return misc.StrictJSONParse(tee, &advisory)
 		}
 
 		if err := downloadJSON(w.client, file.URL(), download); err != nil {
@@ -627,7 +627,6 @@ func (w *worker) mirrorFiles(tlpLabel csaf.TLPLabel, files []csaf.AdvisoryFile) 
 // If this fails it creates a signature itself with the configured key.
 func (w *worker) downloadSignatureOrSign(url, fname string, data []byte) error {
 	sig, err := w.downloadSignature(url)
-
 	if err != nil {
 		if err != errNotFound {
 			w.log.Error("Could not find signature URL", "url", url, "err", err)
