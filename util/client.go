@@ -105,11 +105,19 @@ func (hc *HeaderClient) PostForm(url string, data url.Values) (*http.Response, e
 
 // log logs to a callback if given.
 func (lc *LoggingClient) log(method, url string) {
+	cleanUrl := sanitizeForLog(url)
 	if lc.Log != nil {
-		lc.Log(method, url)
+		lc.Log(method, cleanUrl)
 	} else {
-		log.Printf("[%s]: %s\n", method, url)
+		log.Printf("[%s]: %s\n", method, cleanUrl)
 	}
+}
+
+// sanitizeForLog removes line breaks to prevent log injection.
+func sanitizeForLog(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
 }
 
 // Do implements the respective method of the Client interface.
