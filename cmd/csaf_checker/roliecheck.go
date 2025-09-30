@@ -216,11 +216,6 @@ func defaults[T any](p *T, def T) T {
 // processROLIEFeeds goes through all ROLIE feeds and checks their
 // integrity and completeness.
 func (p *processor) processROLIEFeeds(feeds [][]csaf.Feed) error {
-
-	base, err := url.Parse(p.pmdURL)
-	if err != nil {
-		return err
-	}
 	p.badROLIEFeed.use()
 
 	advisories := map[*csaf.Feed][]csaf.AdvisoryFile{}
@@ -232,12 +227,11 @@ func (p *processor) processROLIEFeeds(feeds [][]csaf.Feed) error {
 			if feed.URL == nil {
 				continue
 			}
-			up, err := url.Parse(string(*feed.URL))
+			feedBase, err := url.Parse(string(*feed.URL))
 			if err != nil {
 				p.badProviderMetadata.error("Invalid URL %s in feed: %v.", *feed.URL, err)
 				continue
 			}
-			feedBase := base.ResolveReference(up)
 			feedURL := feedBase.String()
 			p.checkTLS(feedURL)
 
@@ -264,13 +258,12 @@ func (p *processor) processROLIEFeeds(feeds [][]csaf.Feed) error {
 				continue
 			}
 
-			up, err := url.Parse(string(*feed.URL))
+			feedURL, err := url.Parse(string(*feed.URL))
 			if err != nil {
 				p.badProviderMetadata.error("Invalid URL %s in feed: %v.", *feed.URL, err)
 				continue
 			}
 
-			feedURL := base.ResolveReference(up)
 			feedBase, err := util.BaseURL(feedURL)
 			if err != nil {
 				p.badProviderMetadata.error("Bad base path: %v", err)
@@ -290,7 +283,7 @@ func (p *processor) processROLIEFeeds(feeds [][]csaf.Feed) error {
 			// TODO: Issue a warning if we want check AMBER+ without an
 			// authorizing client.
 
-			if err := p.integrity(files, feedBase, rolieMask, p.badProviderMetadata.add); err != nil {
+			if err := p.integrity(files, rolieMask, p.badProviderMetadata.add); err != nil {
 				if err != errContinue {
 					return err
 				}
@@ -319,13 +312,12 @@ func (p *processor) processROLIEFeeds(feeds [][]csaf.Feed) error {
 				continue
 			}
 
-			up, err := url.Parse(string(*feed.URL))
+			feedBase, err := url.Parse(string(*feed.URL))
 			if err != nil {
 				p.badProviderMetadata.error("Invalid URL %s in feed: %v.", *feed.URL, err)
 				continue
 			}
 
-			feedBase := base.ResolveReference(up)
 			makeAbs := makeAbsolute(feedBase)
 			label := defaults(feed.TLPLabel, csaf.TLPLabelUnlabeled)
 

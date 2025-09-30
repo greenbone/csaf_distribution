@@ -35,6 +35,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/gocsaf/csaf/v3/csaf"
+	"github.com/gocsaf/csaf/v3/internal/misc"
 	"github.com/gocsaf/csaf/v3/pkg/errs"
 	csafErrs "github.com/gocsaf/csaf/v3/pkg/errs"
 	"github.com/gocsaf/csaf/v3/util"
@@ -230,7 +231,7 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 		}
 	}
 
-	base, err := url.Parse(lpmd.URL)
+	pmdURL, err := url.Parse(lpmd.URL)
 	if err != nil {
 		return errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid URL '%s': %v", lpmd.URL, err)}
 	}
@@ -240,7 +241,6 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 	if err := d.loadOpenPGPKeys(
 		client,
 		lpmd.Document,
-		base,
 		expr,
 	); err != nil {
 		return errs.ErrCsafProviderIssue{Message: err.Error()}
@@ -250,7 +250,7 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 		client,
 		expr,
 		lpmd.Document,
-		base)
+		pmdURL)
 
 	// Do we need time range based filtering?
 	if d.cfg.Range != nil {
@@ -318,7 +318,6 @@ allFiles:
 func (d *Downloader) loadOpenPGPKeys(
 	client util.Client,
 	doc any,
-	base *url.URL,
 	expr *util.PathEval,
 ) error {
 	src, err := expr.Eval("$.public_openpgp_keys", doc)
@@ -343,7 +342,7 @@ func (d *Downloader) loadOpenPGPKeys(
 		if key.URL == nil {
 			continue
 		}
-		up, err := url.Parse(*key.URL)
+		u, err := url.Parse(*key.URL)
 		if err != nil {
 			slog.Warn("Invalid URL",
 				"url", *key.URL,
@@ -351,9 +350,7 @@ func (d *Downloader) loadOpenPGPKeys(
 			continue
 		}
 
-		u := base.ResolveReference(up).String()
-
-		res, err := client.Get(u)
+		res, err := client.Get(u.String())
 		if err != nil {
 			slog.Warn(
 				"Fetching public OpenPGP key failed",
@@ -574,7 +571,7 @@ func (dc *downloadContext) downloadAdvisory(
 
 	tee := io.TeeReader(resp.Body, hasher)
 
-	if err := json.NewDecoder(tee).Decode(&doc); err != nil {
+	if err := misc.StrictJSONParse(tee, &doc); err != nil {
 		dc.stats.downloadFailed++
 		errorCh <- csafErrs.ErrInvalidCsaf{Message: fmt.Sprintf("CSAF document %s at URL %s is not valid json: %v", filename, file.URL(), err)}
 		slog.Warn("Downloading failed",

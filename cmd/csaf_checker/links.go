@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/gocsaf/csaf/v3/internal/misc"
+
 	"github.com/PuerkitoBio/goquery"
 
 	"github.com/gocsaf/csaf/v3/util"
@@ -93,7 +95,12 @@ func (pgs pages) listed(
 				return err
 			}
 			// Links may be relative
-			abs := baseURL.ResolveReference(u).String()
+			var abs string
+			if u.IsAbs() {
+				abs = u.String()
+			} else {
+				abs = misc.JoinURL(baseURL, u).String()
+			}
 			content.links.Add(abs)
 			return nil
 		})

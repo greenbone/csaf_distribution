@@ -51,6 +51,12 @@ to download more advisories at once. This may improve the overall speed of the d
 However, since this also increases the load on the servers, their administrators could
 have taken countermeasures to limit this.
 
+For example, some providers may limit the rate of requests that may be sent to retrieve advisories.
+This may cause the downloader to be unable to retrieve all advisories. 
+In this case, the --rate option can be used to adjust the requests per second
+sent by the downloader to an acceptable rate.
+(The rate that is considered acceptable depends on the provider.)
+
 If no config file is explictly given the follwing places are searched for a config file:
 
 ```
@@ -104,8 +110,9 @@ ignorepattern = [".*white.*", ".*red.*"]
 
 #### Timerange option
 
-The `timerange` parameter enables downloading advisories which last changes falls
-into a given intervall. There are three possible notations:
+The `time_range` parameter enables downloading advisories
+which last changes falls into a given intervall.
+There are three possible notations:
 
 1. Relative. If the given string follows the rules of a
    [Go duration](https://pkg.go.dev/time@go1.20.6#ParseDuration),

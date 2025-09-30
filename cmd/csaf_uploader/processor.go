@@ -11,7 +11,6 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -82,8 +81,9 @@ func (p *processor) create() error {
 	}
 	defer resp.Body.Close()
 
+	var createError error
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Create failed: %s\n", resp.Status)
+		createError = fmt.Errorf("create failed: %s", resp.Status)
 	}
 
 	var result struct {
@@ -91,7 +91,7 @@ func (p *processor) create() error {
 		Errors  []string `json:"errors"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := misc.StrictJSONParse(resp.Body, &result); err != nil {
 		return err
 	}
 
@@ -101,7 +101,7 @@ func (p *processor) create() error {
 
 	writeStrings("Errors:", result.Errors)
 
-	return nil
+	return createError
 }
 
 // uploadRequest creates the request for uploading a csaf document by passing the filename.
@@ -115,7 +115,7 @@ func (p *processor) uploadRequest(filename string) (*http.Request, error) {
 
 	if !p.cfg.NoSchemaCheck {
 		var doc any
-		if err := json.NewDecoder(bytes.NewReader(data)).Decode(&doc); err != nil {
+		if err := misc.StrictJSONParse(bytes.NewReader(data), &doc); err != nil {
 			return nil, err
 		}
 		errs, err := csaf.ValidateCSAF(doc)
@@ -239,7 +239,7 @@ func (p *processor) process(filename string) error {
 		Errors      []string `json:"errors"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := misc.StrictJSONParse(resp.Body, &result); err != nil {
 		return err
 	}
 
