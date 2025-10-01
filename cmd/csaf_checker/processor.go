@@ -254,14 +254,12 @@ func (p *processor) run(domains []string) (*Report, error) {
 		if !p.checkProviderMetadata(d) {
 			// We need to fail the domain if the PMD cannot be parsed.
 			p.badProviderMetadata.use()
-			message := fmt.Sprintf("Could not parse the Provider-Metadata.json of: %s", d)
-			p.badProviderMetadata.error(message)
+			p.badProviderMetadata.error("Could not parse the Provider-Metadata.json of: %s", d)
 
 		}
 		if err := p.checkDomain(d); err != nil {
 			p.badProviderMetadata.use()
-			message := fmt.Sprintf("Failed to find valid provider-metadata.json for domain %s: %v. ", d, err)
-			p.badProviderMetadata.error(message)
+			p.badProviderMetadata.error("Failed to find valid provider-metadata.json for domain %s: %v. ", d, err)
 		}
 		domain := &Domain{Name: d}
 
