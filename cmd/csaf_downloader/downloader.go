@@ -35,6 +35,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/gocsaf/csaf/v3/csaf"
+	"github.com/gocsaf/csaf/v3/internal/httpext"
 	"github.com/gocsaf/csaf/v3/internal/misc"
 	"github.com/gocsaf/csaf/v3/pkg/errs"
 	csafErrs "github.com/gocsaf/csaf/v3/pkg/errs"
@@ -487,7 +488,7 @@ func (dc *downloadContext) downloadAdvisory(
 
 	if resp.StatusCode != http.StatusOK {
 		switch {
-		case resp.StatusCode == http.StatusUnauthorized:
+		case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == httpext.StatusNGINXInvalidClientCert || resp.StatusCode == httpext.StatusNGINXNoClientCert:
 			errorCh <- csafErrs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials to retrieve CSAF document %s at URL %s: %s", filename, file.URL(), resp.Status)}
 		case resp.StatusCode == http.StatusForbidden:
 			// if we have access to the feed containing the document, we also must have access to itself, otherwise this indicates a problem with the provider
