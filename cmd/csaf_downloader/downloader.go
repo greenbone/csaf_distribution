@@ -793,6 +793,7 @@ func (d *Downloader) downloadWorker(
 				return
 			}
 		case <-ctx.Done():
+			errorCh <- ctx.Err()
 			return
 		}
 		if err := dc.downloadAdvisory(file, errorCh); err != nil {
