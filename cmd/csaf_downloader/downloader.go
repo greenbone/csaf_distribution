@@ -301,6 +301,7 @@ allFiles:
 		select {
 		case advisoryCh <- file:
 		case <-ctx.Done():
+			errorCh <- ctx.Err()
 			break allFiles
 		}
 	}
