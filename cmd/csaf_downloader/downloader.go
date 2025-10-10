@@ -301,6 +301,7 @@ allFiles:
 		select {
 		case advisoryCh <- file:
 		case <-ctx.Done():
+			errorCh <- context.Cause(ctx)
 			break allFiles
 		}
 	}
@@ -793,6 +794,7 @@ func (d *Downloader) downloadWorker(
 				return
 			}
 		case <-ctx.Done():
+			errorCh <- context.Cause(ctx)
 			return
 		}
 		if err := dc.downloadAdvisory(file, errorCh); err != nil {
