@@ -259,8 +259,8 @@ func (f *Forwarder) forward(
 			f.storeFailed(filename, doc, sha256, sha512)
 			return
 		}
+		defer res.Body.Close()
 		if res.StatusCode != http.StatusCreated {
-			defer res.Body.Close()
 			if msg, err := limitedString(res.Body, 512); err != nil {
 				slog.Error("reading forward result failed",
 					"error", err)

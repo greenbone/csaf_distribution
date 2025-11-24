@@ -361,6 +361,7 @@ func (d *Downloader) loadOpenPGPKeys(
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
+			res.Body.Close()
 			slog.Warn(
 				"Fetching public OpenPGP key failed",
 				"url", u,

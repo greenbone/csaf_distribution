@@ -248,6 +248,7 @@ func (pmdl *ProviderMetadataLoader) loadFromSecurity(domain string) []*LoadedPro
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
+			res.Body.Close()
 			pmdl.messages.Add(
 				HTTPFailed,
 				fmt.Sprintf("Fetching %q failed: %s (%d)", path, res.Status, res.StatusCode))
@@ -305,6 +306,7 @@ func (pmdl *ProviderMetadataLoader) loadFromURL(path string) *LoadedProviderMeta
 		return &result
 	}
 	if res.StatusCode != http.StatusOK {
+		defer res.Body.Close()
 		result.Messages.Add(
 			HTTPFailed,
 			fmt.Sprintf("fetching %q failed: %s (%d)", path, res.Status, res.StatusCode))

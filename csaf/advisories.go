@@ -230,6 +230,7 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 	if err != nil {
 		return nil, errs.ErrNetwork{Message: fmt.Sprintf("failed get request for url %s: %v", changesURL, err)}
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		switch { // we don't expect 401 and 403, as directory based feeds are supposed to be public, but just to be on the safe side
@@ -247,7 +248,6 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 		}
 	}
 
-	defer resp.Body.Close()
 	var files []AdvisoryFile
 	c := csv.NewReader(resp.Body)
 	// format specification:
@@ -331,6 +331,7 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
+			res.Body.Close()
 			slog.Error("Fetching failed",
 				"url", feedURL, "status_code", res.StatusCode, "status", res.Status)
 			switch {
