@@ -349,6 +349,7 @@ func (fc *fakeClient) Do(*http.Request) (*http.Response, error) {
 		return &http.Response{
 			Status:     http.StatusText(http.StatusCreated),
 			StatusCode: http.StatusCreated,
+			Body:       io.NopCloser(strings.NewReader("ok")),
 		}, nil
 	case 1:
 		fc.state = 2
