@@ -300,6 +300,7 @@ func (v *remoteValidator) Validate(doc any) (*RemoteValidationResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf(
@@ -312,7 +313,6 @@ func (v *remoteValidator) Validate(doc any) (*RemoteValidationResult, error) {
 	)
 
 	if err := func() error {
-		defer resp.Body.Close()
 		var in io.Reader
 		// If we are caching record the incoming data and compress it.
 		if key != nil {
