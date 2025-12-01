@@ -47,7 +47,7 @@ jobs:
             go-version: "stable"
 
         - name: Modver
-          uses: bobg/modver@v2.12.1
+          uses: bobg/modver@v2.12.2
           with:
             github_token: ${{ secrets.GITHUB_TOKEN }}
             pull_request_url: https://github.com/${{ github.repository }}/pull/${{ github.event.number }}
