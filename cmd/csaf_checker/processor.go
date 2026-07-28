@@ -1541,7 +1541,11 @@ func (p *processor) checkSecurityFolder(ctx context.Context, folder string) stri
 		var u string
 		if len(lines) > 0 {
 			u = lines[0]
-			for _, unused := range lines[1:] {
+			for i, unused := range lines[1:] {
+				if i == 0 {
+					p.badSecurity.use()
+				}
+				p.badSecurity.add(WarnType, "Unused PMD in security.txt: %s", unused)
 				log.Printf("WARN: Unused PMD in security.txt: %s\n", unused)
 			}
 		}
