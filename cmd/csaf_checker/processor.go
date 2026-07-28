@@ -253,7 +253,6 @@ func (p *processor) run(ctx context.Context, domains []string) (*Report, error) 
 
 	for _, d := range domains {
 		p.reset()
-
 		domain := &Domain{Name: d}
 		if !p.checkProviderMetadata(ctx, d) {
 			// We need to fail the domain if the PMD cannot be parsed.
@@ -266,6 +265,9 @@ func (p *processor) run(ctx context.Context, domains []string) (*Report, error) 
 			report.Domains = append(report.Domains, domain)
 			continue
 		}
+		domain.URL = &p.pmdURL
+		log.Printf("PMD used %q\n", p.pmdURL)
+
 		if err := p.checkDomain(ctx, d); err != nil {
 			p.badProviderMetadata.use()
 			p.badProviderMetadata.error("Failed to find valid provider-metadata.json for domain %s: %v. ", d, err)
@@ -425,6 +427,9 @@ func (p *processor) checkRedirect(r *http.Request, via []*http.Request) error {
 // fullClient returns a fully configure HTTP client.
 func (p *processor) fullClient() util.ClientWithContext {
 	hClient := http.Client{}
+	if p.cfg.ClientTimeout != nil {
+		hClient.Timeout = *p.cfg.ClientTimeout
+	}
 
 	hClient.CheckRedirect = p.checkRedirect
 
@@ -470,6 +475,9 @@ func (p *processor) fullClient() util.ClientWithContext {
 // basicClient returns a http Client w/o certs and headers.
 func (p *processor) basicClient() util.ClientWithContext {
 	hClient := http.Client{}
+	if p.cfg.ClientTimeout != nil {
+		hClient.Timeout = *p.cfg.ClientTimeout
+	}
 	if p.cfg.Insecure {
 		hClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -727,9 +735,9 @@ func (p *processor) extractWithModel(feed string, res *http.Response) ([]csaf.Ad
 
 		switch {
 		case sha256 == "" && sha512 != "":
-			p.badROLIEFeed.info("%s has no sha256 hash file listed", url)
+			p.badROLIEFeed.info("No sha256 hash file listed on ROLIE feed %s", url)
 		case sha256 != "" && sha512 == "":
-			p.badROLIEFeed.info("%s has no sha512 hash file listed", url)
+			p.badROLIEFeed.info("No sha512 hash file listed on ROLIE feed %s", url)
 		case sha256 == "" && sha512 == "":
 			p.badROLIEFeed.error("No hash listed on ROLIE feed %s", url)
 		case sign == "":
