@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -146,12 +147,7 @@ func (w *worker) writeProviderMetadata(ctx context.Context) error {
 
 	// Fill in directory URLs if needed.
 	if w.provider.writeIndices(w.processor.cfg) {
-		labels := make([]string, 0, len(w.summaries))
-		for label := range w.summaries {
-			labels = append(labels, label)
-		}
-		slices.Sort(labels)
-		for _, label := range labels {
+		for _, label := range slices.SortedFunc(maps.Keys(w.summaries)) {
 			pm.AddDirectoryDistribution(prefixURL.JoinPath(label).String())
 		}
 	}
