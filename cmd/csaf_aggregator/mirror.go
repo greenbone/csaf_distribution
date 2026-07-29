@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -151,7 +150,7 @@ func (w *worker) writeProviderMetadata(ctx context.Context) error {
 		for label := range w.summaries {
 			labels = append(labels, label)
 		}
-		sort.Strings(labels)
+		slices.Sort(labels)
 		for _, label := range labels {
 			pm.AddDirectoryDistribution(prefixURL.JoinPath(label).String())
 		}

@@ -9,9 +9,9 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/gocsaf/csaf/v3/util"
@@ -145,7 +145,7 @@ func (r *tlsReporter) report(p *processor, domain *Domain) {
 		urls[i] = k
 		i++
 	}
-	sort.Strings(urls)
+	slices.Sort(urls)
 	req.message(ErrorType, "Following non-HTTPS URLs were used:")
 	req.message(ErrorType, urls...)
 }
@@ -194,14 +194,16 @@ func (r *redirectsReporter) report(p *processor, domain *Domain) {
 
 	keys := keysNotInValues(p.redirects)
 
-	first := func(i int) string {
-		if vs := p.redirects[keys[i]]; len(vs) > 0 {
+	first := func(key string) string {
+		if vs := p.redirects[key]; len(vs) > 0 {
 			return vs[0]
 		}
 		return ""
 	}
 
-	sort.Slice(keys, func(i, j int) bool { return first(i) < first(j) })
+	slices.SortFunc(keys, func(a, b string) int {
+		return cmp.Compare(first(a), first(b))
+	})
 
 	for i, k := range keys {
 		keys[i] = fmt.Sprintf("Redirect %s -> %s", strings.Join(p.redirects[k], " -> "), k)
