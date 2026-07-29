@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -127,7 +128,7 @@ func (w *worker) labelsFromSummaries() []csaf.TLPLabel {
 	for label := range w.summaries {
 		labels = append(labels, csaf.TLPLabel(strings.ToUpper(label)))
 	}
-	sort.Slice(labels, func(i, j int) bool { return labels[i] < labels[j] })
+	slices.Sort(labels)
 	return labels
 }
 

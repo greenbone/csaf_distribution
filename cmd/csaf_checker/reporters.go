@@ -10,6 +10,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -84,10 +85,8 @@ func (bc *baseReporter) requirement(domain *Domain) *Requirement {
 // contains returns whether any of vs is present in s.
 func containsAny[E comparable](s []E, vs ...E) bool {
 	for _, e := range s {
-		for _, v := range vs {
-			if e == v {
-				return true
-			}
+		if slices.Contains(vs, e) {
+			return true
 		}
 	}
 	return false

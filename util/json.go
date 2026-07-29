@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/Intevation/gval"
@@ -120,10 +121,8 @@ func StringMatcher(dst *string) func(any) error {
 func StringTreeMatcher(strings *[]string) func(any) error {
 	// Only add unique strings.
 	unique := func(s string) {
-		for _, t := range *strings {
-			if s == t {
-				return
-			}
+		if slices.Contains(*strings, s) {
+			return
 		}
 		*strings = append(*strings, s)
 	}
