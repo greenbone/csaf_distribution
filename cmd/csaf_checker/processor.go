@@ -1259,14 +1259,11 @@ func (p *processor) checkChanges(ctx context.Context, base string, mask whereTyp
 	return p.integrity(ctx, files, mask, p.badChanges.add)
 }
 
-// empty checks if list of strings contains at least one none empty string.
+// empty checks if list of strings contains only empty strings.
 func empty(arr []string) bool {
-	for _, s := range arr {
-		if s != "" {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc(arr, func(a string) bool {
+		return a != ""
+	})
 }
 
 func (p *processor) checkCSAFs(ctx context.Context, _ string) error {
