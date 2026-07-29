@@ -84,12 +84,9 @@ func (bc *baseReporter) requirement(domain *Domain) *Requirement {
 
 // contains returns whether any of vs is present in s.
 func containsAny[E comparable](s []E, vs ...E) bool {
-	for _, e := range s {
-		if slices.Contains(vs, e) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(s, func(e E) bool {
+		return slices.Contains(vs, e)
+	})
 }
 
 // report reports if there where any invalid filenames,
