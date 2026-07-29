@@ -147,7 +147,7 @@ func (w *worker) writeProviderMetadata(ctx context.Context) error {
 
 	// Fill in directory URLs if needed.
 	if w.provider.writeIndices(w.processor.cfg) {
-		for _, label := range slices.SortedFunc(maps.Keys(w.summaries)) {
+		for _, label := range slices.Sorted(maps.Keys(w.summaries)) {
 			pm.AddDirectoryDistribution(prefixURL.JoinPath(label).String())
 		}
 	}
