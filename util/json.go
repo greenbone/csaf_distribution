@@ -121,10 +121,9 @@ func StringMatcher(dst *string) func(any) error {
 func StringTreeMatcher(strings *[]string) func(any) error {
 	// Only add unique strings.
 	unique := func(s string) {
-		if slices.Contains(*strings, s) {
-			return
+		if !slices.Contains(*strings, s) {
+			*strings = append(*strings, s)
 		}
-		*strings = append(*strings, s)
 	}
 	var recurse func(any) error
 	recurse = func(x any) error {
