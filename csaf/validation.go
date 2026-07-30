@@ -164,8 +164,8 @@ func (cs *compiledSchema) validate(doc any) ([]string, error) {
 		if strings.HasPrefix(pi, pj) {
 			return +1
 		}
-		if pi != pj {
-			return cmp.Compare(pi, pj)
+		if d := cmp.Compare(pi, pj); d != 0 {
+			return d
 		}
 		return cmp.Compare(a.Error.String(), b.Error.String())
 	})
