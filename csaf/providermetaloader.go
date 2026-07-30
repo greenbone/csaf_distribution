@@ -88,10 +88,9 @@ func (pmlm *ProviderMetadataLoadMessages) Add(
 // AppendUnique appends unique messages from a second list.
 func (pmlm *ProviderMetadataLoadMessages) AppendUnique(other ProviderMetadataLoadMessages) {
 	for _, o := range other {
-		if slices.Contains(*pmlm, o) {
-			continue
+		if !slices.Contains(*pmlm, o) {
+			*pmlm = append(*pmlm, o)
 		}
-		*pmlm = append(*pmlm, o)
 	}
 }
 
@@ -300,10 +299,9 @@ func (pmdl *ProviderMetadataLoader) loadFromSecurity(ctx context.Context, domain
 				continue
 			}
 			// Check for duplicates
-			if slices.Contains(loaded, lpmd) {
-				continue
+			if !slices.Contains(loaded, lpmd) {
+				loaded = append(loaded, lpmd)
 			}
-			loaded = append(loaded, lpmd)
 		}
 
 		return loaded
