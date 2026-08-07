@@ -367,21 +367,6 @@ func (v *remoteValidator) validate(
 		rvr  RemoteValidationResult
 	)
 
-<<<<<<< HEAD
-	if err := func() error {
-		var in io.Reader
-		// If we are caching record the incoming data and compress it.
-		if key != nil {
-			buf.Reset() // reuse the out buffer.
-			zout = zlib.NewWriter(&buf)
-			in = io.TeeReader(resp.Body, zout)
-		} else {
-			// no cache -> process directly.
-			in = resp.Body
-		}
-		return misc.StrictJSONParse(in, &rvr)
-	}(); err != nil {
-=======
 	in := io.Reader(resp.Body)
 	// If we are caching record the incoming data and compress it.
 	if key != nil {
@@ -390,7 +375,6 @@ func (v *remoteValidator) validate(
 		in = io.TeeReader(in, zout)
 	}
 	if err := misc.StrictJSONParse(in, &rvr); err != nil {
->>>>>>> main
 		return nil, err
 	}
 

@@ -18,7 +18,6 @@ on:
         description: Set an explicit version, that will overwrite release-type. Fails if version is not compliant.
 
 jobs:
-<<<<<<< HEAD
   release:
     name: csaf_distribution
     uses: greenbone/workflows/.github/workflows/release-generic.yml@main
@@ -26,30 +25,3 @@ jobs:
       release-type: ${{ inputs.release-type }}
       release-version: ${{ inputs.release-version }}
     secrets: inherit
-=======
-  releases-matrix:
-    name: Release Go binaries
-    # use oldest available ubuntu to be compatible with more libc.so revs.
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Go
-        uses: actions/setup-go@v7
-        with:
-            go-version: '^1.24.9'
-            check-latest: true
-
-      - name: Build
-        run: make dist
-
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v3
-        with:
-            files: |
-                dist/csaf-*.zip
-                dist/csaf-*.tar.gz
->>>>>>> main

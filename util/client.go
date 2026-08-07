@@ -162,7 +162,6 @@ func (lc *LoggingClient) log(method, url string) {
 	}
 }
 
-<<<<<<< HEAD
 // sanitizeForLog removes line breaks to prevent log injection.
 func sanitizeForLog(s string) string {
 	s = strings.ReplaceAll(s, "\n", "")
@@ -170,10 +169,7 @@ func sanitizeForLog(s string) string {
 	return s
 }
 
-// Do implements the respective method of the Client interface.
-=======
 // Do implements the respective method of the [Client] interface.
->>>>>>> main
 func (lc *LoggingClient) Do(req *http.Request) (*http.Response, error) {
 	lc.log("DO", req.URL.String())
 	return lc.Client.Do(req)

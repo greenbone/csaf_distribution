@@ -21,11 +21,8 @@ import (
 
 	"github.com/gocsaf/csaf/v3/internal/httpext"
 	"github.com/gocsaf/csaf/v3/internal/misc"
-<<<<<<< HEAD
-	"github.com/gocsaf/csaf/v3/pkg/errs"
-=======
 	"github.com/gocsaf/csaf/v3/internal/models"
->>>>>>> main
+	"github.com/gocsaf/csaf/v3/pkg/errs"
 	"github.com/gocsaf/csaf/v3/util"
 )
 
@@ -253,7 +250,6 @@ func (afp *AdvisoryFileProcessor) loadChanges(
 	}
 	defer resp.Body.Close()
 
-	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		switch { // we don't expect 401 and 403, as directory based feeds are supposed to be public, but just to be on the safe side
 		case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == httpext.StatusNGINXInvalidClientCert || resp.StatusCode == httpext.StatusNGINXNoClientCert:
@@ -359,10 +355,9 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			continue
 		}
 		if res.StatusCode != http.StatusOK {
-			res.Body.Close()
 			slog.Error("Fetching failed",
 				"url", feedURL, "status_code", res.StatusCode, "status", res.Status)
-<<<<<<< HEAD
+			res.Body.Close()
 			switch {
 			case res.StatusCode == http.StatusUnauthorized:
 				feedErrs = append(feedErrs, errs.ErrInvalidCredentials{Message: fmt.Sprintf("invalid credentials for TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status)})
@@ -376,60 +371,55 @@ func (afp *AdvisoryFileProcessor) processROLIE(
 			default: // client error or fringe case
 				feedErrs = append(feedErrs, fmt.Errorf("could not retrieve TLP:%s ROLIE feed at %s: %s", label, feedURL.String(), res.Status))
 			}
-=======
-			res.Body.Close()
->>>>>>> main
 			continue
 		}
+
 		var files []AdvisoryFile
 		if afp.StreamingROLIEParser {
 			if err := afp.processROLIEStream(&files, res); err != nil {
 				slog.Error("Streaming ROLIE feed failed", "err", err)
+				feedErrs = append(feedErrs, err)
 				continue
 			}
-		} else if err := afp.processROLIELegacy(&files, res); err != nil {
+		} else if errs := afp.processROLIELegacy(&files, res, string(label), feedURL.String()); len(errs) > 0 {
 			slog.Error("Loading ROLIE feed failed", "err", err)
-			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("TLP:%s ROLIE feed at %s is not valid JSON: %v", label, feedURL.String(), err)})
+			feedErrs = append(errs, errs...)
 			continue
 		}
 
-<<<<<<< HEAD
-		var files []AdvisoryFile
-
-		resolve := func(u string) (string, error) {
-			if u == "" {
-				return "", errs.ErrCsafProviderIssue{Message: fmt.Sprintf("empty url in TLP:%s ROLIE feed at %s to file", label, feedURL.String())}
-			}
-			p, err := url.Parse(u)
-			if err != nil {
-				slog.Error("Invalid URL", "url", u, "err", err)
-				return "", errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid url in TLP:%s ROLIE feed at %s to file %s: %v", label, feedURL.String(), u, err)}
-			}
-			return p.String(), nil
-=======
-		var label TLPLabel
-		if feed.TLPLabel != nil {
-			label = *feed.TLPLabel
-		} else {
-			label = "unknown"
->>>>>>> main
-		}
-
 		if err := fn(label, files); err != nil {
-			return err
+			feedErrs = append(feedErrs, err)
 		}
+	}
+	if len(feedErrs) > 0 {
+		return &errs.CompositeErrFeed{Errs: feedErrs}
 	}
 	return nil
 }
 
-func (afp *AdvisoryFileProcessor) processROLIELegacy(files *[]AdvisoryFile, res *http.Response) error {
+func (afp *AdvisoryFileProcessor) processROLIELegacy(files *[]AdvisoryFile, res *http.Response, label string, feedURL string) []error {
+	var feedErrs []error
 	rfeed, err := func() (*ROLIEFeed, error) {
 		defer res.Body.Close()
 		return LoadROLIEFeed(res.Body)
 	}()
 	if err != nil {
-		return err
+		feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("TLP:%s ROLIE feed at %s is not valid JSON: %v", label, feedURL, err)})
+		return feedErrs
 	}
+
+	resolve := func(u string) (string, error) {
+		if u == "" {
+			return "", errs.ErrCsafProviderIssue{Message: fmt.Sprintf("empty url in TLP:%s ROLIE feed at %s to file", label, feedURL)}
+		}
+		p, err := url.Parse(u)
+		if err != nil {
+			slog.Error("Invalid URL", "url", u, "err", err)
+			return "", errs.ErrCsafProviderIssue{Message: fmt.Sprintf("invalid url in TLP:%s ROLIE feed at %s to file %s: %v", label, feedURL, u, err)}
+		}
+		return p.String(), nil
+	}
+
 	rfeed.Entries(func(entry *Entry) {
 		// Filter if we have date checking.
 		if afp.AgeAccept != nil {
@@ -440,42 +430,62 @@ func (afp *AdvisoryFileProcessor) processROLIELegacy(files *[]AdvisoryFile, res 
 
 		var self, sha256, sha512, sign string
 
+		var csafLinkExists bool
 		for i := range entry.Link {
 			link := &entry.Link[i]
 			lower := strings.ToLower(link.HRef)
 			switch link.Rel {
 			case "self":
-				self = afp.resolveURL(link.HRef)
+				csafLinkExists = true
+				self, err = resolve(link.HRef)
+				if err != nil {
+					feedErrs = append(feedErrs, err)
+					return
+				}
 			case "signature":
-				sign = afp.resolveURL(link.HRef)
+				sign, err = resolve(link.HRef)
+				if err != nil {
+					feedErrs = append(feedErrs, err)
+				}
 			case "hash":
 				switch {
 				case strings.HasSuffix(lower, ".sha256"):
-					sha256 = afp.resolveURL(link.HRef)
+					sha256, err = resolve(link.HRef)
+					if err != nil {
+						feedErrs = append(feedErrs, err)
+					}
 				case strings.HasSuffix(lower, ".sha512"):
-					sha512 = afp.resolveURL(link.HRef)
+					sha512, err = resolve(link.HRef)
+					if err != nil {
+						feedErrs = append(feedErrs, err)
+					}
 				}
 			}
 		}
 
-		if self == "" {
-			return
+		if !csafLinkExists {
+			feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("TLP:%s ROLIE feed at %s contains entry (ID '%s') without link to csaf document", label, feedURL, entry.ID)})
 		}
 
 		switch {
 		case sha256 == "" && sha512 == "":
 			slog.Error("No hash listed on ROLIE feed", "file", self)
-			return
+			err := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no hash listed on TLP:%s ROLIE feed (%s) for CSAF %s", label, feedURL, self)}
+			feedErrs = append(feedErrs, err)
 		case sign == "":
 			slog.Error("No signature listed on ROLIE feed", "file", self)
-			return
+			err := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no signature listed on TLP:%s ROLIE feed (%s) for CSAF %s", label, feedURL, self)}
+			feedErrs = append(feedErrs, err)
 		default:
 			*files = append(*files, PlainAdvisoryFile{self, sha256, sha512, sign})
 		}
 	})
-	return nil
+
+	return feedErrs
 }
 
+// NOTE: This method was not (yet) adjusted to return typed errors and ignores some errors (they are only logged but not returned).
+// As this is experimental so far, we want to wait until the implementation is mature before we make the effort to add typed errors.
 func (afp *AdvisoryFileProcessor) processROLIEStream(files *[]AdvisoryFile, res *http.Response) error {
 	defer res.Body.Close()
 	srp := models.StreamingROLIEParser{
@@ -489,37 +499,6 @@ func (afp *AdvisoryFileProcessor) processROLIEStream(files *[]AdvisoryFile, res 
 
 			var self, sha256, sha512, sign string
 
-<<<<<<< HEAD
-			var csafLinkExists bool
-			for i := range entry.Link {
-				link := &entry.Link[i]
-				lower := strings.ToLower(link.HRef)
-				switch link.Rel {
-				case "self":
-					csafLinkExists = true
-					self, err = resolve(link.HRef)
-					if err != nil {
-						feedErrs = append(feedErrs, err)
-						return
-					}
-				case "signature":
-					sign, err = resolve(link.HRef)
-					if err != nil {
-						feedErrs = append(feedErrs, err)
-					}
-				case "hash":
-					switch {
-					case strings.HasSuffix(lower, ".sha256"):
-						sha256, err = resolve(link.HRef)
-						if err != nil {
-							feedErrs = append(feedErrs, err)
-						}
-					case strings.HasSuffix(lower, ".sha512"):
-						sha512, err = resolve(link.HRef)
-						if err != nil {
-							feedErrs = append(feedErrs, err)
-						}
-=======
 			for i := range sr.Links {
 				link := sr.Links[i]
 				lower := strings.ToLower(link.HRef)
@@ -534,13 +513,12 @@ func (afp *AdvisoryFileProcessor) processROLIEStream(files *[]AdvisoryFile, res 
 						sha256 = afp.resolveURL(link.HRef)
 					case strings.HasSuffix(lower, ".sha512"):
 						sha512 = afp.resolveURL(link.HRef)
->>>>>>> main
 					}
 				}
 			}
 
-			if !csafLinkExists {
-				feedErrs = append(feedErrs, errs.ErrCsafProviderIssue{Message: fmt.Sprintf("TLP:%s ROLIE feed at %s contains entry (ID '%s') without link to csaf document", label, feedURL.String(), entry.ID)})
+			if self == "" {
+				return
 			}
 
 			var file AdvisoryFile
@@ -548,31 +526,14 @@ func (afp *AdvisoryFileProcessor) processROLIEStream(files *[]AdvisoryFile, res 
 			switch {
 			case sha256 == "" && sha512 == "":
 				slog.Error("No hash listed on ROLIE feed", "file", self)
-				err := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no hash listed on TLP:%s ROLIE feed (%s) for CSAF %s", label, feedURL.String(), self)}
-				feedErrs = append(feedErrs, err)
 				return
 			case sign == "":
 				slog.Error("No signature listed on ROLIE feed", "file", self)
-				err := errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no signature listed on TLP:%s ROLIE feed (%s) for CSAF %s", label, feedURL.String(), self)}
-				feedErrs = append(feedErrs, err)
 				return
 			default:
 				file = PlainAdvisoryFile{self, sha256, sha512, sign}
 			}
 
-<<<<<<< HEAD
-			files = append(files, file)
-		})
-
-		if err := fn(label, files); err != nil {
-			feedErrs = append(feedErrs, err)
-		}
-	}
-	if len(feedErrs) > 0 {
-		return &errs.CompositeErrFeed{Errs: feedErrs}
-	}
-	return nil
-=======
 			*files = append(*files, file)
 		},
 	}
@@ -589,5 +550,4 @@ func (afp *AdvisoryFileProcessor) resolveURL(u string) string {
 		return ""
 	}
 	return p.String()
->>>>>>> main
 }

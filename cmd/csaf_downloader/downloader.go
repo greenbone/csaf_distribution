@@ -54,13 +54,8 @@ type Downloader struct {
 	cfg       *Config
 	client    *util.Client // Used for testing
 	keys      *crypto.KeyRing
-<<<<<<< HEAD
-	validator csaf.RemoteValidator
-	Forwarder *Forwarder
-=======
 	validator csaf.RemoteValidatorWithContext
-	forwarder *forwarder
->>>>>>> main
+	Forwarder *Forwarder
 	mkdirMu   sync.Mutex
 	statsMu   sync.Mutex
 	stats     stats
@@ -72,13 +67,8 @@ type Downloader struct {
 // unsafe mode.
 const failedValidationDir = "failed_validation"
 
-<<<<<<< HEAD
 func NewDownloader(cfg *Config) (*Downloader, error) {
-	var validator csaf.RemoteValidator
-=======
-func newDownloader(cfg *config) (*downloader, error) {
 	var validator csaf.RemoteValidatorWithContext
->>>>>>> main
 
 	if cfg.RemoteValidator != "" {
 		validatorOptions := csaf.RemoteValidatorOptions{
@@ -128,11 +118,7 @@ func logRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-<<<<<<< HEAD
-func (d *Downloader) httpClient() util.Client {
-=======
-func (d *downloader) httpClient() util.ClientWithContext {
->>>>>>> main
+func (d *Downloader) httpClient() util.ClientWithContext {
 	hClient := http.Client{}
 	if d.cfg.ClientTimeout != nil {
 		hClient.Timeout = *d.cfg.ClientTimeout
@@ -200,11 +186,7 @@ func httpLog(who string) func(string, string) {
 	}
 }
 
-<<<<<<< HEAD
-func (d *Downloader) enumerate(domain string) error {
-=======
-func (d *downloader) enumerate(ctx context.Context, domain string) error {
->>>>>>> main
+func (d *Downloader) enumerate(ctx context.Context, domain string) error {
 	client := d.httpClient()
 
 	loader := csaf.NewProviderMetadataLoader(client)
@@ -343,14 +325,9 @@ allFiles:
 	return nil
 }
 
-<<<<<<< HEAD
 func (d *Downloader) loadOpenPGPKeys(
-	client util.Client,
-=======
-func (d *downloader) loadOpenPGPKeys(
 	ctx context.Context,
 	client util.ClientWithContext,
->>>>>>> main
 	doc any,
 	expr *util.PathEval,
 ) error {
@@ -460,15 +437,9 @@ func (d *Downloader) logValidationIssues(url string, errors []string, err error)
 
 // downloadContext stores the common context of a downloader.
 type downloadContext struct {
-<<<<<<< HEAD
 	d                  *Downloader
-	client             util.Client
-	data               bytes.Buffer
-=======
-	d                  *downloader
 	client             util.ClientWithContext
 	pool               misc.BufferPool
->>>>>>> main
 	lastDir            string
 	initialReleaseDate time.Time
 	dateExtract        func(any) error
@@ -477,15 +448,11 @@ type downloadContext struct {
 	expr               *util.PathEval
 }
 
-<<<<<<< HEAD
-func newDownloadContext(d *Downloader, label csaf.TLPLabel) *downloadContext {
-=======
 func newDownloadContext(
-	d *downloader,
+	d *Downloader,
 	label csaf.TLPLabel,
 	pool misc.BufferPool,
 ) *downloadContext {
->>>>>>> main
 	dc := &downloadContext{
 		d:      d,
 		client: d.httpClient(),
@@ -748,16 +715,10 @@ func (dc *downloadContext) downloadAdvisory(
 	valStatus.update(validValidationStatus)
 
 	// Send to forwarder
-<<<<<<< HEAD
 	if dc.d.Forwarder != nil {
 		dc.d.Forwarder.forward(
-			filename, dc.data.String(),
-=======
-	if dc.d.forwarder != nil {
-		dc.d.forwarder.forward(
 			ctx,
 			filename, data.String(),
->>>>>>> main
 			valStatus,
 			string(s256Data),
 			string(s512Data))
@@ -765,7 +726,7 @@ func (dc *downloadContext) downloadAdvisory(
 
 	if dc.d.cfg.ForwardChannel {
 		// the bytes slice is modified by the next buffer modification, so we need to copy it
-		dc.d.Csafs <- slices.Clone(dc.data.Bytes())
+		dc.d.Csafs <- slices.Clone(data.Bytes())
 	}
 
 	if dc.d.cfg.NoStore {
@@ -976,11 +937,7 @@ func (d *Downloader) Run(ctx context.Context, domains []string) error {
 }
 
 // runEnumerate performs the enumeration of PMDs for all the given domains.
-<<<<<<< HEAD
-func (d *Downloader) RunEnumerate(domains []string) error {
-=======
-func (d *downloader) runEnumerate(ctx context.Context, domains []string) error {
->>>>>>> main
+func (d *Downloader) RunEnumerate(ctx context.Context, domains []string) error {
 	defer d.stats.log()
 	for _, domain := range domains {
 		if err := d.enumerate(ctx, domain); err != nil {

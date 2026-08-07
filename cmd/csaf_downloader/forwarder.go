@@ -47,17 +47,10 @@ func (vs *validationStatus) update(status validationStatus) {
 
 // Forwarder forwards downloaded advisories to a given
 // HTTP endpoint.
-<<<<<<< HEAD
 type Forwarder struct {
 	cfg    *Config
 	cmds   chan func(*Forwarder)
-	client util.Client
-=======
-type forwarder struct {
-	cfg    *config
-	cmds   chan func(*forwarder)
 	client util.ClientWithContext
->>>>>>> main
 
 	failed    int
 	succeeded int
@@ -100,11 +93,7 @@ func (f *Forwarder) Log() {
 
 // httpClient returns a cached HTTP client used for uploading
 // the advisories to the configured HTTP endpoint.
-<<<<<<< HEAD
-func (f *Forwarder) httpClient() util.Client {
-=======
-func (f *forwarder) httpClient() util.ClientWithContext {
->>>>>>> main
+func (f *Forwarder) httpClient() util.ClientWithContext {
 	if f.client != nil {
 		return f.client
 	}
@@ -153,12 +142,8 @@ func replaceExt(fname, nExt string) string {
 }
 
 // buildRequest creates an HTTP request suited to forward the given advisory.
-<<<<<<< HEAD
 func (f *Forwarder) buildRequest(
-=======
-func (f *forwarder) buildRequest(
 	ctx context.Context,
->>>>>>> main
 	filename, doc string,
 	status validationStatus,
 	sha256, sha512 string,
@@ -260,24 +245,15 @@ func limitedString(r io.Reader, maxLength int) (string, error) {
 // forward sends a given document with filename, status and
 // checksums to the forwarder. This is async to the degree
 // till the configured queue size is filled.
-<<<<<<< HEAD
 func (f *Forwarder) forward(
-=======
-func (f *forwarder) forward(
 	ctx context.Context,
->>>>>>> main
 	filename, doc string,
 	status validationStatus,
 	sha256, sha512 string,
 ) {
 	// Run this in the main loop of the forwarder.
-<<<<<<< HEAD
 	f.cmds <- func(f *Forwarder) {
-		req, err := f.buildRequest(filename, doc, status, sha256, sha512)
-=======
-	f.cmds <- func(f *forwarder) {
 		req, err := f.buildRequest(ctx, filename, doc, status, sha256, sha512)
->>>>>>> main
 		if err != nil {
 			slog.Error("building forward Request failed",
 				"error", err)
