@@ -229,6 +229,9 @@ func (d *Downloader) download(ctx context.Context, domain string) error {
 				"domain", domain,
 				"message", lpmd.Messages[i].Message)
 		}
+		if cancellErr := context.Cause(ctx); cancellErr != nil {
+			return cancellErr // if the caller cancels, there is no issue on provider side
+		}
 		return errs.ErrCsafProviderIssue{Message: fmt.Sprintf("no valid provider-metadata.json found for '%s'", domain)}
 	} else if d.cfg.verbose() {
 		for i := range lpmd.Messages {
