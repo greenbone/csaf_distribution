@@ -11,10 +11,12 @@ package csaf
 import (
 	"encoding/json"
 	"io"
+	"slices"
 	"sort"
 	"time"
 
 	"github.com/gocsaf/csaf/v3/internal/misc"
+	"github.com/gocsaf/csaf/v3/internal/models"
 	"github.com/gocsaf/csaf/v3/util"
 )
 
@@ -139,10 +141,7 @@ func (rcd *ROLIECategoryDocument) WriteTo(w io.Writer) (int64, error) {
 }
 
 // Link for ROLIE.
-type Link struct {
-	Rel  string `json:"rel"`
-	HRef string `json:"href"`
-}
+type Link = models.Link
 
 // ROLIECategory for ROLIE.
 type ROLIECategory struct {
@@ -208,6 +207,11 @@ func LoadROLIEFeed(r io.Reader) (*ROLIEFeed, error) {
 	if err := misc.StrictJSONParse(r, &rf); err != nil {
 		return nil, err
 	}
+	// A JSON null inside the entry array unmarshals to a nil *Entry.
+	// Drop those here so consumers can rely on all entries being non-nil.
+	rf.Feed.Entry = slices.DeleteFunc(rf.Feed.Entry, func(e *Entry) bool {
+		return e == nil
+	})
 	return &rf, nil
 }
 

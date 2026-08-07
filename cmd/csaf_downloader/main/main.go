@@ -44,7 +44,11 @@ func run(cfg *csaf_downloader.Config, domains []string) error {
 	// If the enumerate-only flag is set, enumerate found PMDs,
 	// else use the normal load method
 	if cfg.EnumeratePMDOnly {
+<<<<<<< HEAD:cmd/csaf_downloader/main/main.go
 		return d.RunEnumerate(domains)
+=======
+		return d.runEnumerate(ctx, domains)
+>>>>>>> main:cmd/csaf_downloader/main.go
 	}
 	return d.Run(ctx, domains)
 }
