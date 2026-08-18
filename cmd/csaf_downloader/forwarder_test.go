@@ -11,6 +11,7 @@ package csaf_downloader
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -130,6 +131,7 @@ func TestForwarderBuildRequest(t *testing.T) {
 	fw := NewForwarder(cfg)
 
 	req, err := fw.buildRequest(
+		context.Background(),
 		"test.json", "{}",
 		invalidValidationStatus,
 		"256",
@@ -208,6 +210,7 @@ func TestForwarderBuildRequest(t *testing.T) {
 	cfg.ForwardURL = "%"
 
 	if _, err := fw.buildRequest(
+		context.Background(),
 		"test.json", "{}",
 		invalidValidationStatus,
 		"256",
@@ -337,7 +340,7 @@ func TestStoredFailed(t *testing.T) {
 }
 
 type fakeClient struct {
-	util.Client
+	util.ClientWithContext
 	state int
 }
 
@@ -405,6 +408,7 @@ func TestForwarderForward(t *testing.T) {
 	// Iterate through states of http client.
 	for i := 0; i <= 3; i++ {
 		fw.forward(
+			context.Background(),
 			"test.json", "{}",
 			invalidValidationStatus,
 			"256",
@@ -419,6 +423,7 @@ func TestForwarderForward(t *testing.T) {
 	}
 	<-wait
 	fw.forward(
+		context.Background(),
 		"test.json", "{}",
 		invalidValidationStatus,
 		"256",
