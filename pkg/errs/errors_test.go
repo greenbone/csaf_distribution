@@ -52,3 +52,15 @@ func TestFlattenError(t *testing.T) {
 		assert.ElementsMatch(t, wantFlattenedErrors, gotFlattenedErrors)
 	})
 }
+
+func TestTypedErrorsUnwrap(t *testing.T) {
+	cause := errors.New("cause")
+
+	for _, err := range []error{
+		ErrNetwork{Err: fmt.Errorf("network error: %w", cause)},
+		ErrCsafProviderIssue{Err: fmt.Errorf("provider issue: %w", cause)},
+		ErrInvalidCsaf{Err: fmt.Errorf("invalid CSAF: %w", cause)},
+	} {
+		assert.ErrorIs(t, err, cause)
+	}
+}

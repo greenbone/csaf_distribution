@@ -12,29 +12,41 @@ import (
 
 // ErrNetwork indicates a network level error
 type ErrNetwork struct {
-	Message string
+	Err error
 }
 
 func (e ErrNetwork) Error() string {
-	return e.Message
+	return e.Err.Error()
+}
+
+func (e ErrNetwork) Unwrap() error {
+	return e.Err
 }
 
 // ErrInvalidCsaf notifies about an invalid csaf document (can only be fixed by the CSAF Source/Provider)
 type ErrInvalidCsaf struct {
-	Message string
+	Err error
 }
 
 func (e ErrInvalidCsaf) Error() string {
-	return e.Message
+	return e.Err.Error()
+}
+
+func (e ErrInvalidCsaf) Unwrap() error {
+	return e.Err
 }
 
 // ErrCsafProviderIssue is an error which is not related directly the contents of a csaf document and can be only fixed by the CSAF Source/Provider
 type ErrCsafProviderIssue struct {
-	Message string
+	Err error
 }
 
 func (e ErrCsafProviderIssue) Error() string {
-	return e.Message
+	return e.Err.Error()
+}
+
+func (e ErrCsafProviderIssue) Unwrap() error {
+	return e.Err
 }
 
 type ErrInvalidCredentials struct {
