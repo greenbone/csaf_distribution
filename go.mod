@@ -12,7 +12,7 @@ require (
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.55.0
 	golang.org/x/net v0.58.0
@@ -25,13 +25,9 @@ require (
 	github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f // indirect
 	github.com/andybalholm/cascadia v1.3.4 // indirect
 	github.com/cloudflare/circl v1.6.5 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
