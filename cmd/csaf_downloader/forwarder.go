@@ -58,10 +58,7 @@ type Forwarder struct {
 
 // NewForwarder creates a new forwarder.
 func NewForwarder(cfg *Config) *Forwarder {
-	queue := cfg.ForwardQueue
-	if queue < 1 {
-		queue = 1
-	}
+	queue := max(cfg.ForwardQueue, 1)
 	return &Forwarder{
 		cfg:  cfg,
 		cmds: make(chan func(*Forwarder), queue),
